@@ -1,0 +1,133 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 660" width="1200" height="660" font-family="Heebo, Assistant, Arial, sans-serif">
+  <title>Kilohertz ERP-AI architecture</title>
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5b6475"/>
+    </marker>
+    <style>
+      .bg { fill: #f7f8fb; }
+      .card { fill: #ffffff; stroke: #d5dae3; stroke-width: 1.2; }
+      .core { fill: #fff7f0; stroke: #f08a3c; stroke-width: 2; }
+      .grp { fill: #ffffff; stroke: #f3c39b; stroke-width: 1.2; }
+      .h1 { font-size: 22px; font-weight: 700; fill: #1d2433; }
+      .h2 { font-size: 15px; font-weight: 700; fill: #1d2433; }
+      .t { font-size: 13px; fill: #3a4253; }
+      .s { font-size: 11.5px; fill: #6b7385; }
+      .wf { font-size: 12.5px; fill: #1d2433; }
+      .tag { font-size: 11px; font-weight: 700; fill: #b85a16; letter-spacing: .4px; }
+      .line { stroke: #5b6475; stroke-width: 1.4; fill: none; marker-end: url(#arr); }
+      .dash { stroke: #9aa3b5; stroke-width: 1.2; fill: none; stroke-dasharray: 5 4; marker-end: url(#arr); }
+    </style>
+  </defs>
+
+  <rect class="bg" width="1200" height="660" rx="14"/>
+  <text class="h1" x="40" y="46">Kilohertz ERP-AI — System Architecture</text>
+  <text class="s" x="40" y="68">3 layers · Data: Airtable · Logic: n8n Cloud (10 workflows, 3 AI agents, RAG) · Interface: Telegram bots + admin app</text>
+
+  <!-- Inputs -->
+  <text class="tag" x="40" y="108">TRIGGERS / INPUTS</text>
+  <g>
+    <rect class="card" x="40" y="120" width="210" height="58" rx="10"/>
+    <text class="h2" x="56" y="145">Telegram · Manager bot</text>
+    <text class="s" x="56" y="165">owner only (chat-id check)</text>
+
+    <rect class="card" x="40" y="192" width="210" height="58" rx="10"/>
+    <text class="h2" x="56" y="217">Telegram · Customer bot</text>
+    <text class="s" x="56" y="237">public customer questions</text>
+
+    <rect class="card" x="40" y="264" width="210" height="58" rx="10"/>
+    <text class="h2" x="56" y="289">Admin app</text>
+    <text class="s" x="56" y="309">Lovable / Base44 → webhook</text>
+
+    <rect class="card" x="40" y="336" width="210" height="58" rx="10"/>
+    <text class="h2" x="56" y="361">Website lead form</text>
+    <text class="s" x="56" y="381">POST → lead webhook</text>
+
+    <rect class="card" x="40" y="408" width="210" height="58" rx="10"/>
+    <text class="h2" x="56" y="433">Gmail inbox</text>
+    <text class="s" x="56" y="453">lead replies (poll 30 min)</text>
+
+    <rect class="card" x="40" y="480" width="210" height="58" rx="10"/>
+    <text class="h2" x="56" y="505">Schedules + Airtable polls</text>
+    <text class="s" x="56" y="525">every 1 min / every 3 h</text>
+  </g>
+
+  <!-- Core -->
+  <rect class="core" x="300" y="96" width="560" height="530" rx="16"/>
+  <text class="h2" x="320" y="124">n8n Cloud — automation &amp; agents</text>
+  <text class="s" x="320" y="142">zero Code nodes · every workflow opens with a Hebrew sticky note</text>
+
+  <rect class="grp" x="320" y="158" width="255" height="150" rx="10"/>
+  <text class="tag" x="334" y="180">AI AGENTS</text>
+  <text class="wf" x="334" y="204">WF09 · Manager agent (analytics + tasks)</text>
+  <text class="wf" x="334" y="228">WF05 · Customer service agent (RAG)</text>
+  <text class="wf" x="334" y="252">WF13 · App API + chat (webhook)</text>
+  <text class="s" x="334" y="282">model: OpenAI chat · memory per chat</text>
+
+  <rect class="grp" x="585" y="158" width="255" height="150" rx="10"/>
+  <text class="tag" x="599" y="180">SALES</text>
+  <text class="wf" x="599" y="204">WF03 · Lead intake + de-duplication</text>
+  <text class="wf" x="599" y="228">WF04a · AI cold email (1 lead / run)</text>
+  <text class="wf" x="599" y="252">WF04b · Reply check → follow-up task</text>
+
+  <rect class="grp" x="320" y="320" width="255" height="130" rx="10"/>
+  <text class="tag" x="334" y="342">TAX DOCUMENTS</text>
+  <text class="wf" x="334" y="366">WF01 · Validate + VAT 18% / 17%</text>
+  <text class="wf" x="334" y="390">WF08 · Sequential number → HTML</text>
+  <text class="wf" x="334" y="410">            → Drive → PdfUrl</text>
+
+  <rect class="grp" x="585" y="320" width="255" height="130" rx="10"/>
+  <text class="tag" x="599" y="342">RAG (manual, run after restart)</text>
+  <text class="wf" x="599" y="366">WF06 · Policies → embeddings</text>
+  <text class="wf" x="599" y="390">WF07 · Products → embeddings</text>
+  <text class="s" x="599" y="420">OpenAI text-embedding-3-small</text>
+
+  <rect class="grp" x="320" y="462" width="520" height="80" rx="10"/>
+  <text class="tag" x="334" y="484">IN-MEMORY VECTOR STORE</text>
+  <text class="wf" x="334" y="508">kilohertz_policies  ·  kilohertz_products</text>
+  <text class="s" x="334" y="528">read by WF05 / WF09 / WF13 as retrieval tools</text>
+  <path class="dash" d="M712 450 L712 462"/>
+
+  <rect class="grp" x="320" y="554" width="520" height="56" rx="10"/>
+  <text class="tag" x="334" y="576">SECRETS</text>
+  <text class="s" x="334" y="596">all keys live in n8n Credentials only — never in the app, the repo or the workflows</text>
+
+  <!-- Outputs -->
+  <text class="tag" x="910" y="108">SERVICES / OUTPUTS</text>
+  <g>
+    <rect class="card" x="910" y="120" width="250" height="78" rx="10"/>
+    <text class="h2" x="926" y="146">Airtable — the database</text>
+    <text class="s" x="926" y="166">Invoices · Leads · Products · Tasks</text>
+    <text class="s" x="926" y="184">(model of 14 tables, 4 in use)</text>
+
+    <rect class="card" x="910" y="214" width="250" height="62" rx="10"/>
+    <text class="h2" x="926" y="240">OpenAI</text>
+    <text class="s" x="926" y="260">chat model + embeddings</text>
+
+    <rect class="card" x="910" y="292" width="250" height="62" rx="10"/>
+    <text class="h2" x="926" y="318">Gmail</text>
+    <text class="s" x="926" y="338">cold emails out · replies in</text>
+
+    <rect class="card" x="910" y="370" width="250" height="62" rx="10"/>
+    <text class="h2" x="926" y="396">Google Drive</text>
+    <text class="s" x="926" y="416">generated tax documents (HTML)</text>
+
+    <rect class="card" x="910" y="448" width="250" height="62" rx="10"/>
+    <text class="h2" x="926" y="474">Telegram replies</text>
+    <text class="s" x="926" y="494">answers to owner / customers</text>
+  </g>
+
+  <!-- arrows in -->
+  <path class="line" d="M250 149 L300 149"/>
+  <path class="line" d="M250 221 L300 221"/>
+  <path class="line" d="M250 293 L300 293"/>
+  <path class="line" d="M250 365 L300 365"/>
+  <path class="line" d="M250 437 L300 437"/>
+  <path class="line" d="M250 509 L300 509"/>
+  <!-- arrows out -->
+  <path class="line" d="M860 159 L910 159"/>
+  <path class="line" d="M860 245 L910 245"/>
+  <path class="line" d="M860 323 L910 323"/>
+  <path class="line" d="M860 401 L910 401"/>
+  <path class="line" d="M860 479 L910 479"/>
+</svg>
