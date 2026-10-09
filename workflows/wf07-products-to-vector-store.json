@@ -1,0 +1,237 @@
+{
+  "id": "khzWf07Products",
+  "name": "WF07 · Products to Vector Store",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## WF07 · טעינת קטלוג המוצרים למאגר הווקטורי\n**מה עושה:** קורא את כל המוצרים מטבלת **Products** ב-Airtable, בונה לכל מוצר פסקה אחת בעברית (שם, מק\"ט, קטגוריה, מחיר ב-₪, במלאי כן/לא, תיאור), הופך אותה ל-Embedding ושומר במאגר בזיכרון `kilohertz_products` (עם metadata של sku ו-name). המאגר מתרוקן לפני הטעינה — בלי כפילויות.\n**טריגר:** ידני בלבד.\n**שדות בשימוש:** Sku · Name · Category · Price · Description · InStock.\n**אחרי ייבוא:** בצומת Get All Products לבחור את הבסיס (במקום appXXXXXXXXXXXXXX) ואז שוב את הטבלה Products; לבחור credential של Airtable ושל OpenAI.\n**חשוב:** אחרי כל שינוי במוצרים, ואחרי כל הפעלה מחדש של n8n — להריץ שוב (קודם WF06, אחר כך WF07).",
+        "height": 210,
+        "width": 1120,
+        "color": 5
+      },
+      "id": "8d3b1f69-16c7-4c75-ba31-4e295b0cbda5",
+      "name": "הסבר התהליך",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -40,
+        50
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "722a5066-cd02-429c-b05a-151d660096b2",
+      "name": "Run Manually",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "search",
+        "base": {
+          "__rl": true,
+          "mode": "id",
+          "value": "appXXXXXXXXXXXXXX"
+        },
+        "table": {
+          "__rl": true,
+          "mode": "id",
+          "value": "Products"
+        },
+        "filterByFormula": "",
+        "returnAll": true,
+        "options": {},
+        "sort": {}
+      },
+      "id": "fbc17038-78db-4f25-800a-855769df1638",
+      "name": "Get All Products",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.2,
+      "position": [
+        240,
+        320
+      ],
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "khzAirtable0001",
+          "name": "Airtable - Kilohertz"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "9dc51b1e-9629-4e1a-af66-1a4b93f8c172",
+              "name": "product_text",
+              "value": "=מוצר: {{ $json.fields.Name || 'ללא שם' }}\nמק\"ט: {{ $json.fields.Sku || 'לא צוין' }}\nקטגוריה: {{ $json.fields.Category || 'לא צוינה' }}\nמחיר: {{ $json.fields.Price !== undefined ? $json.fields.Price + ' ₪' : 'לא צוין' }}\nבמלאי: {{ $json.fields.InStock ? 'כן' : 'לא' }}\nתיאור: {{ $json.fields.Description || 'אין תיאור' }}",
+              "type": "string"
+            },
+            {
+              "id": "ccc284a3-c40f-4306-9a3e-3c7d6ff4bc99",
+              "name": "sku",
+              "value": "={{ $json.fields.Sku || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "0f0c539a-acba-402f-bfa0-12e42ad49467",
+              "name": "name",
+              "value": "={{ $json.fields.Name || '' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "14d36323-e80c-43d0-8acd-936c09517d8e",
+      "name": "Build Product Text",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        480,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "insert",
+        "memoryKey": {
+          "__rl": true,
+          "mode": "id",
+          "value": "kilohertz_products"
+        },
+        "embeddingBatchSize": 1000,
+        "clearStore": true
+      },
+      "id": "d14681b4-6365-4da7-ae43-2715e776bf3a",
+      "name": "Store Product Vectors",
+      "type": "@n8n/n8n-nodes-langchain.vectorStoreInMemory",
+      "typeVersion": 1.3,
+      "position": [
+        740,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "model": "text-embedding-3-small",
+        "options": {}
+      },
+      "id": "fde785f3-aefb-46f0-b882-516489de30ad",
+      "name": "Product Embeddings",
+      "type": "@n8n/n8n-nodes-langchain.embeddingsOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        660,
+        540
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "khzOpenAi000001",
+          "name": "OpenAI - Kilohertz"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "dataType": "json",
+        "jsonMode": "expressionData",
+        "jsonData": "={{ $json.product_text }}",
+        "textSplittingMode": "simple",
+        "options": {
+          "metadata": {
+            "metadataValues": [
+              {
+                "name": "sku",
+                "value": "={{ $json.sku }}"
+              },
+              {
+                "name": "name",
+                "value": "={{ $json.name }}"
+              },
+              {
+                "name": "source",
+                "value": "products"
+              }
+            ]
+          }
+        }
+      },
+      "id": "986131fc-5443-4d8c-ae3c-eeb8c02b2058",
+      "name": "Product Text Loader",
+      "type": "@n8n/n8n-nodes-langchain.documentDefaultDataLoader",
+      "typeVersion": 1.1,
+      "position": [
+        880,
+        540
+      ]
+    }
+  ],
+  "connections": {
+    "Run Manually": {
+      "main": [
+        [
+          {
+            "node": "Get All Products",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get All Products": {
+      "main": [
+        [
+          {
+            "node": "Build Product Text",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Product Text": {
+      "main": [
+        [
+          {
+            "node": "Store Product Vectors",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Product Embeddings": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Store Product Vectors",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Product Text Loader": {
+      "ai_document": [
+        [
+          {
+            "node": "Store Product Vectors",
+            "type": "ai_document",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": []
+}
