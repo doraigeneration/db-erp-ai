@@ -1,0 +1,377 @@
+{
+  "id": "khzWf01TaxDocs",
+  "name": "WF01 · Tax Document Validation",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## WF01 · אימות מסמכי מס וחישוב מע\"מ\n\n**מה התהליך עושה:** כל רשומה חדשה בטבלת Invoices נבדקת אוטומטית. התהליך מחשב מע\"מ ומעביר את המסמך לתור ההפקה (Pending), או מסמן אותו כפסול (Invalid) עם הסבר בשדה Notes.\n\n**טריגר:** Airtable Trigger על הטבלה Invoices, לפי השדה Created (סוג Created time), סריקה פעם בדקה.\n\n**חוקי החישוב:**\n- שיעור מע\"מ 18%, או 17% כשתאריך המסמך (IssueDate) לפני 01/01/2025\n- VatAmount = Amount × שיעור, מעוגל לשתי ספרות · Total = Amount + VatAmount\n- מסמך תקין רק אם: Amount גדול מ-0, יש CustomerId, DocType הוא חשבונית / חשבונית מס / קבלה, ו-Status ריק או New\n\n**שדות בשימוש (Invoices):** Amount, IssueDate, CustomerId, DocType, Status, VatRate, VatAmount, Total, Notes, Created\n\n**אחרי הייבוא — חובה:**\n1. בכל צומת Airtable (כולל הטריגר): לבחור את ה-Base שלכם במקום appXXXXXXXXXXXXXX, ואז לבחור מחדש את הטבלה Invoices\n2. לבחור את ה-Credential של Airtable בכל צומת\n3. להפעיל (Activate) — מהרגע הזה כל חשבונית חדשה תיבדק תוך כדקה\n\nאחרי שהמסמך מקבל Pending, תהליך WF08 מפיק לו מסמך HTML בדרייב.",
+        "height": 404,
+        "width": 1180,
+        "color": 5
+      },
+      "id": "a4b29a82-d5ed-4122-a9f1-b419cc3917bd",
+      "name": "הסבר על התהליך",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -60,
+        -284
+      ]
+    },
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "authentication": "airtableTokenApi",
+        "baseId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "appXXXXXXXXXXXXXX"
+        },
+        "tableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "Invoices"
+        },
+        "triggerField": "Created",
+        "additionalFields": {}
+      },
+      "id": "c8eab4c1-a56e-427a-8c8b-4328ddcbee71",
+      "name": "Watch New Invoices",
+      "type": "n8n-nodes-base.airtableTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        300
+      ],
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "khzAirtable0001",
+          "name": "Airtable - Kilohertz"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "0a04a64d-e881-4d8b-9a9d-67f9b984dea2",
+              "name": "recordId",
+              "value": "={{ $json.id }}",
+              "type": "string"
+            },
+            {
+              "id": "a1c4fa51-d916-49a8-8d6d-f5554dc8e53a",
+              "name": "VatRate",
+              "value": "={{ (String($json.fields.IssueDate ?? '').slice(0, 10) !== '' && String($json.fields.IssueDate).slice(0, 10) < '2025-01-01' ? 0.17 : 0.18) }}",
+              "type": "number"
+            },
+            {
+              "id": "0f2cf0bb-a0eb-455b-b859-a58b4f04bdfc",
+              "name": "VatAmount",
+              "value": "={{ Math.round((Number($json.fields.Amount) || 0) * (String($json.fields.IssueDate ?? '').slice(0, 10) !== '' && String($json.fields.IssueDate).slice(0, 10) < '2025-01-01' ? 0.17 : 0.18) * 100) / 100 }}",
+              "type": "number"
+            },
+            {
+              "id": "dc0b6269-3914-4f2b-be7e-dbb6b0d6c5c6",
+              "name": "Total",
+              "value": "={{ Math.round(((Number($json.fields.Amount) || 0) + Math.round((Number($json.fields.Amount) || 0) * (String($json.fields.IssueDate ?? '').slice(0, 10) !== '' && String($json.fields.IssueDate).slice(0, 10) < '2025-01-01' ? 0.17 : 0.18) * 100) / 100) * 100) / 100 }}",
+              "type": "number"
+            },
+            {
+              "id": "c794d3f5-31ab-4ebf-914d-7232644b99e7",
+              "name": "isValid",
+              "value": "={{ (Number($json.fields.Amount) || 0) > 0 && String($json.fields.CustomerId ?? '').trim() !== '' && ['חשבונית', 'חשבונית מס', 'קבלה'].includes(String($json.fields.DocType ?? '').trim()) && ['', 'New'].includes(String($json.fields.Status ?? '').trim()) }}",
+              "type": "boolean"
+            },
+            {
+              "id": "2655462a-56c4-406e-8324-52ab00fe6460",
+              "name": "failedChecks",
+              "value": "={{ [(Number($json.fields.Amount) || 0) > 0 ? '' : 'הסכום (Amount) חסר או אינו גדול מאפס', String($json.fields.CustomerId ?? '').trim() !== '' ? '' : 'חסר מזהה לקוח (CustomerId)', ['חשבונית', 'חשבונית מס', 'קבלה'].includes(String($json.fields.DocType ?? '').trim()) ? '' : 'סוג המסמך (DocType) חייב להיות חשבונית, חשבונית מס או קבלה', ['', 'New'].includes(String($json.fields.Status ?? '').trim()) ? '' : 'הסטטוס הנוכחי אינו New ולכן המסמך לא נכנס לתור' ].filter(Boolean).join(' | ') }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "aaa24ae3-33d6-48fd-9612-298950f8132c",
+      "name": "Calculate VAT And Check Rules",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        240,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "0f2076ff-b5f3-4615-822f-5052224b6cb5",
+              "leftValue": "={{ $json.isValid }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "8e0bb307-4e3b-44ac-9216-153594da1269",
+      "name": "Passed All Checks?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        480,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "airtableTokenApi",
+        "resource": "record",
+        "operation": "update",
+        "base": {
+          "__rl": true,
+          "mode": "id",
+          "value": "appXXXXXXXXXXXXXX"
+        },
+        "table": {
+          "__rl": true,
+          "mode": "id",
+          "value": "Invoices"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "id": "={{ $json.recordId }}",
+            "VatRate": "={{ $json.VatRate }}",
+            "VatAmount": "={{ $json.VatAmount }}",
+            "Total": "={{ $json.Total }}",
+            "Status": "Pending"
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": false
+            },
+            {
+              "id": "VatRate",
+              "displayName": "VatRate",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "VatAmount",
+              "displayName": "VatAmount",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Total",
+              "displayName": "Total",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "9a8f2251-c851-48ab-9a0f-27409755a425",
+      "name": "Queue Document As Pending",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.2,
+      "position": [
+        720,
+        180
+      ],
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "khzAirtable0001",
+          "name": "Airtable - Kilohertz"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "airtableTokenApi",
+        "resource": "record",
+        "operation": "update",
+        "base": {
+          "__rl": true,
+          "mode": "id",
+          "value": "appXXXXXXXXXXXXXX"
+        },
+        "table": {
+          "__rl": true,
+          "mode": "id",
+          "value": "Invoices"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "id": "={{ $json.recordId }}",
+            "Status": "Invalid",
+            "Notes": "={{ 'המסמך נדחה בבדיקה האוטומטית (' + $now.toFormat('dd/MM/yyyy HH:mm') + '): ' + $json.failedChecks }}"
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": false
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Notes",
+              "displayName": "Notes",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "e6179669-f5b6-4963-94f0-fb2cc46bd367",
+      "name": "Flag Document As Invalid",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.2,
+      "position": [
+        720,
+        420
+      ],
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "khzAirtable0001",
+          "name": "Airtable - Kilohertz"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Watch New Invoices": {
+      "main": [
+        [
+          {
+            "node": "Calculate VAT And Check Rules",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calculate VAT And Check Rules": {
+      "main": [
+        [
+          {
+            "node": "Passed All Checks?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Passed All Checks?": {
+      "main": [
+        [
+          {
+            "node": "Queue Document As Pending",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Flag Document As Invalid",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": []
+}

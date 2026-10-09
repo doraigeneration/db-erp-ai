@@ -1,0 +1,548 @@
+{
+  "id": "khzWf08InvoiceDoc",
+  "name": "WF08 · Invoice Document To Drive",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## WF08 · הפקת מסמך חשבונית והעלאה לגוגל דרייב\n\n**מה התהליך עושה:** פעם בדקה לוקח מסמך אחד בסטטוס Pending מטבלת Invoices, נותן לו את המספר הרץ הבא לפי סוג המסמך (חשבונית / חשבונית מס / קבלה — לכל סוג סדרה משלו, מתחילה ב-1001), בונה מסמך HTML בעברית RTL, הופך אותו לקובץ, מעלה לדרייב ומעדכן ברשומה: InvoiceNumber, PdfUrl (קישור לקובץ) ו-Status = Done.\n\n**טריגר:** Schedule — כל דקה\n\n**איפה התבנית?** בצומת \"בניית HTML\", בשדה html. התבנית משתמשת בשדות שהוכנו בצומת Prepare Document Data (מספר, תאריך, לקוח, מע\"מ). הסכומים מוצגים מעוצבים בפורמט עברי עם שתי ספרות אחרי הנקודה (AmountText, VatAmountText, TotalText).\n\n**PDF:** אין שירות המרה חיצוני. בדרייב: קליק ימני על הקובץ ← Open with ← Google Docs ← File ← Download ← PDF.\n\n**שדות בשימוש (Invoices):** InvoiceNumber, DocType, CustomerId, CustomerName, CustomerEmail, IssueDate, Amount, VatRate, VatAmount, Total, Status, PdfUrl, Notes, Created\n\n**מגבלה ידועה:** המספור הרץ נקבע לפי המספר הגבוה הקיים, ולכן שני מסמכים שמופקים באותו רגע עלולים לקבל אותו מספר. לכן התהליך מטפל במסמך אחד בכל הרצה.\n\n**אחרי הייבוא — חובה:**\n1. בשלושת צומתי Airtable: לבחור את ה-Base שלכם במקום appXXXXXXXXXXXXXX ולבחור מחדש את הטבלה Invoices\n2. לבחור Credentials: Airtable, ו-Google Drive בצומת ההעלאה\n3. בצומת Upload To Google Drive: התיקייה כרגע היא שורש הדרייב (Root). מומלץ לבחור תיקייה ייעודית, למשל \"Kilohertz - מסמכים\"\n4. להפעיל (Activate)",
+        "height": 424,
+        "width": 1500,
+        "color": 5
+      },
+      "id": "a2f572f8-7d90-471c-929e-19fb1c2e0bc5",
+      "name": "הסבר על התהליך",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -60,
+        -184
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 1
+            }
+          ]
+        }
+      },
+      "id": "fbc7c3fb-91ee-4f68-8dda-ca81a7cfb0a5",
+      "name": "Every Minute",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        0,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "airtableTokenApi",
+        "resource": "record",
+        "operation": "search",
+        "base": {
+          "__rl": true,
+          "mode": "id",
+          "value": "appXXXXXXXXXXXXXX"
+        },
+        "table": {
+          "__rl": true,
+          "mode": "id",
+          "value": "Invoices"
+        },
+        "filterByFormula": "{Status}='Pending'",
+        "returnAll": false,
+        "limit": 1,
+        "options": {},
+        "sort": {
+          "property": [
+            {
+              "field": "Created",
+              "direction": "asc"
+            }
+          ]
+        }
+      },
+      "id": "53d7f7bc-718d-4600-a8bf-8a353aecb6a2",
+      "name": "Find Pending Invoice",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.2,
+      "position": [
+        240,
+        300
+      ],
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "khzAirtable0001",
+          "name": "Airtable - Kilohertz"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "airtableTokenApi",
+        "resource": "record",
+        "operation": "search",
+        "base": {
+          "__rl": true,
+          "mode": "id",
+          "value": "appXXXXXXXXXXXXXX"
+        },
+        "table": {
+          "__rl": true,
+          "mode": "id",
+          "value": "Invoices"
+        },
+        "filterByFormula": "=AND({DocType}='{{ $json.fields.DocType }}', {InvoiceNumber} > 0)",
+        "returnAll": false,
+        "limit": 1,
+        "options": {},
+        "sort": {
+          "property": [
+            {
+              "field": "InvoiceNumber",
+              "direction": "desc"
+            }
+          ]
+        }
+      },
+      "id": "c6bd9d6c-15d2-43c7-a57a-e75067c75015",
+      "name": "Find Last Number Of Type",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.2,
+      "position": [
+        480,
+        300
+      ],
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "khzAirtable0001",
+          "name": "Airtable - Kilohertz"
+        }
+      },
+      "alwaysOutputData": true,
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a9c606aa-dc59-4ad0-af01-ec58035865b5",
+              "name": "recordId",
+              "value": "={{ $('Find Pending Invoice').first().json.id }}",
+              "type": "string"
+            },
+            {
+              "id": "9efd19fb-2124-4e50-89d9-1931437801a2",
+              "name": "DocType",
+              "value": "={{ String($('Find Pending Invoice').first().json.fields.DocType ?? '').trim() }}",
+              "type": "string"
+            },
+            {
+              "id": "32594882-67a6-4513-9784-669e4e2a682b",
+              "name": "DocNumber",
+              "value": "={{ (Number($json.fields?.InvoiceNumber) || 1000) + 1 }}",
+              "type": "number"
+            },
+            {
+              "id": "93ec0f93-a7d1-4f84-a203-6c975138ee1e",
+              "name": "DocTitle",
+              "value": "={{ String($('Find Pending Invoice').first().json.fields.DocType ?? '').trim() || 'מסמך' }}",
+              "type": "string"
+            },
+            {
+              "id": "1a3aa347-9db3-42fe-9c87-32d1cf6be47d",
+              "name": "IssueDate",
+              "value": "={{ $('Find Pending Invoice').first().json.fields.IssueDate ? DateTime.fromISO(String($('Find Pending Invoice').first().json.fields.IssueDate)).toFormat('dd/MM/yyyy') : $now.toFormat('dd/MM/yyyy') }}",
+              "type": "string"
+            },
+            {
+              "id": "f58e0ff1-d1af-4fbb-936a-015754861fcb",
+              "name": "CustomerId",
+              "value": "={{ $('Find Pending Invoice').first().json.fields.CustomerId ?? '' }}",
+              "type": "string"
+            },
+            {
+              "id": "d7607b37-aa9c-47ef-a371-71c3fb01d129",
+              "name": "CustomerName",
+              "value": "={{ $('Find Pending Invoice').first().json.fields.CustomerName ?? '' }}",
+              "type": "string"
+            },
+            {
+              "id": "f8787e9e-08d2-48fe-842d-fa0ab6ff9d71",
+              "name": "CustomerEmail",
+              "value": "={{ $('Find Pending Invoice').first().json.fields.CustomerEmail ?? '' }}",
+              "type": "string"
+            },
+            {
+              "id": "84c4bbf7-ba13-4518-a51d-b235c3c9dda7",
+              "name": "Amount",
+              "value": "={{ (Number($('Find Pending Invoice').first().json.fields.Amount) || 0) }}",
+              "type": "number"
+            },
+            {
+              "id": "645f2d81-5351-4f49-838b-d2eabcb273a8",
+              "name": "VatAmount",
+              "value": "={{ (Number($('Find Pending Invoice').first().json.fields.VatAmount) || 0) }}",
+              "type": "number"
+            },
+            {
+              "id": "2e739586-5ef1-49ea-b43b-f4a78918d5f1",
+              "name": "Total",
+              "value": "={{ (Number($('Find Pending Invoice').first().json.fields.Total) || 0) }}",
+              "type": "number"
+            },
+            {
+              "id": "0545cf75-691c-4b36-945b-8d94d9d053e3",
+              "name": "VatRatePercent",
+              "value": "={{ (Number($('Find Pending Invoice').first().json.fields.VatRate) || 0) > 1 ? (Number($('Find Pending Invoice').first().json.fields.VatRate) || 0) : Math.round((Number($('Find Pending Invoice').first().json.fields.VatRate) || 0) * 100) }}",
+              "type": "number"
+            },
+            {
+              "id": "531179a5-a92c-4a4c-ab71-21ef75a3c3d0",
+              "name": "AmountText",
+              "value": "={{ (Number($('Find Pending Invoice').first().json.fields.Amount) || 0).toLocaleString('he-IL', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}",
+              "type": "string"
+            },
+            {
+              "id": "6ed77e53-b917-4add-8385-157344f2047e",
+              "name": "VatAmountText",
+              "value": "={{ (Number($('Find Pending Invoice').first().json.fields.VatAmount) || 0).toLocaleString('he-IL', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}",
+              "type": "string"
+            },
+            {
+              "id": "29b924fe-8b8f-433f-9a08-8afe3554cc2a",
+              "name": "TotalText",
+              "value": "={{ (Number($('Find Pending Invoice').first().json.fields.Total) || 0).toLocaleString('he-IL', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}",
+              "type": "string"
+            },
+            {
+              "id": "a9faf6a8-344f-40e8-81a4-9fc31b61013d",
+              "name": "Notes",
+              "value": "={{ $('Find Pending Invoice').first().json.fields.Notes ?? '' }}",
+              "type": "string"
+            },
+            {
+              "id": "53853848-f5a3-43f6-baae-3957aafbabec",
+              "name": "GeneratedAt",
+              "value": "={{ $now.toFormat('dd/MM/yyyy HH:mm') }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "d4a50743-fe30-4ba8-9383-d42928e1b0aa",
+      "name": "Prepare Document Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        720,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "c9387d04-110a-437a-b6c0-eb51889fd044",
+              "name": "html",
+              "value": "=<!DOCTYPE html>\n<html dir=\"rtl\" lang=\"he\">\n<head>\n<meta charset=\"UTF-8\">\n<title>{{ $json.DocTitle }} {{ $json.DocNumber }} | קילוהרץ אלקטרוניקה</title>\n<style>\n@page { size: A4; margin: 14mm; }\n* { box-sizing: border-box; }\nbody { margin: 0; background: #ffffff; color: #1f2933; font-family: Arial, \"Segoe UI\", Tahoma, sans-serif; font-size: 13px; line-height: 1.55; }\n.sheet { width: 182mm; margin: 0 auto; padding: 6mm 0; }\n.top { display: table; width: 100%; border-bottom: 3px solid #0b6e6e; padding-bottom: 10px; }\n.brand, .doc { display: table-cell; vertical-align: top; }\n.brand-name { font-size: 22px; font-weight: bold; color: #0b6e6e; margin: 0; }\n.brand-sub { color: #52606d; font-size: 12px; margin: 2px 0 0; }\n.doc { text-align: left; }\n.doc-title { font-size: 24px; font-weight: bold; margin: 0; color: #1f2933; }\n.doc-meta { margin: 4px 0 0; color: #3e4c59; }\n.tag { display: inline-block; border: 1px solid #0b6e6e; color: #0b6e6e; padding: 1px 8px; font-size: 11px; margin-top: 6px; }\n.boxes { display: table; width: 100%; margin: 16px 0; border-spacing: 0; }\n.box { display: table-cell; width: 50%; vertical-align: top; padding: 10px 12px; background: #f3f7f7; border: 1px solid #d9e2e2; }\n.box h3 { margin: 0 0 6px; font-size: 12px; color: #0b6e6e; text-transform: none; }\n.box p { margin: 2px 0; }\ntable.lines { width: 100%; border-collapse: collapse; margin-top: 4px; }\ntable.lines th { background: #0b6e6e; color: #ffffff; text-align: right; padding: 8px 10px; font-weight: bold; }\ntable.lines td { padding: 10px; border-bottom: 1px solid #d9e2e2; }\ntable.lines .num { text-align: left; width: 32%; white-space: nowrap; }\n.totals { width: 52%; margin: 14px auto 0 0; border-collapse: collapse; }\n.totals td { padding: 6px 10px; }\n.totals .num { text-align: left; white-space: nowrap; }\n.totals tr.grand td { border-top: 2px solid #1f2933; font-size: 16px; font-weight: bold; padding-top: 9px; }\n.notes { margin-top: 18px; padding: 10px 12px; border-right: 3px solid #0b6e6e; background: #fafcfc; min-height: 40px; }\n.notes h3 { margin: 0 0 4px; font-size: 12px; color: #0b6e6e; }\n.foot { margin-top: 28px; padding-top: 8px; border-top: 1px solid #d9e2e2; text-align: center; color: #7b8794; font-size: 11px; }\n</style>\n</head>\n<body>\n<div class=\"sheet\">\n\n  <div class=\"top\">\n    <div class=\"brand\">\n      <p class=\"brand-name\">קילוהרץ אלקטרוניקה</p>\n      <p class=\"brand-sub\">Kilohertz Electronics</p>\n      <p class=\"brand-sub\">רחוב המלאכה 14, פתח תקווה</p>\n      <p class=\"brand-sub\">ח.פ. 516000000 · טלפון 03-0000000</p>\n      <p class=\"brand-sub\">sales@kilohertz.example · kilohertz.example</p>\n    </div>\n    <div class=\"doc\">\n      <p class=\"doc-title\">{{ $json.DocTitle }}</p>\n      <p class=\"doc-meta\">מספר מסמך: <strong>{{ $json.DocNumber }}</strong></p>\n      <p class=\"doc-meta\">תאריך הפקה: {{ $json.IssueDate }}</p>\n      <span class=\"tag\">מקור</span>\n    </div>\n  </div>\n\n  <div class=\"boxes\">\n    <div class=\"box\">\n      <h3>פרטי הלקוח</h3>\n      <p><strong>{{ $json.CustomerName }}</strong></p>\n      <p>מספר לקוח: {{ $json.CustomerId }}</p>\n      <p>דוא\"ל: {{ $json.CustomerEmail }}</p>\n    </div>\n    <div class=\"box\">\n      <h3>פרטי המסמך</h3>\n      <p>סוג מסמך: {{ $json.DocTitle }}</p>\n      <p>שיעור מע\"מ: {{ $json.VatRatePercent }}%</p>\n      <p>מטבע: שקל חדש (₪)</p>\n    </div>\n  </div>\n\n  <table class=\"lines\">\n    <thead>\n      <tr>\n        <th>תיאור</th>\n        <th class=\"num\">סכום לפני מע\"מ</th>\n      </tr>\n    </thead>\n    <tbody>\n      <tr>\n        <td>מוצרים ושירותים לפי הזמנה</td>\n        <td class=\"num\">₪ {{ $json.AmountText }}</td>\n      </tr>\n    </tbody>\n  </table>\n\n  <table class=\"totals\">\n    <tr>\n      <td>לפני מע\"מ</td>\n      <td class=\"num\">₪ {{ $json.AmountText }}</td>\n    </tr>\n    <tr>\n      <td>מע\"מ {{ $json.VatRatePercent }}%</td>\n      <td class=\"num\">₪ {{ $json.VatAmountText }}</td>\n    </tr>\n    <tr class=\"grand\">\n      <td>סה\"כ לתשלום</td>\n      <td class=\"num\">₪ {{ $json.TotalText }}</td>\n    </tr>\n  </table>\n\n  <div class=\"notes\">\n    <h3>הערות</h3>\n    <div>{{ $json.Notes }}</div>\n  </div>\n\n  <div class=\"foot\">\n    מסמך ממוחשב — הופק אוטומטית על ידי מערכת ERP-AI\n    <br>קילוהרץ אלקטרוניקה · ח.פ. 516000000 · service@kilohertz.example\n  </div>\n\n</div>\n</body>\n</html>\n",
+              "type": "string"
+            },
+            {
+              "id": "140ec359-7b49-44ec-8a24-841a25a55e57",
+              "name": "fileName",
+              "value": "={{ $json.DocTitle.replace(/\\s+/g, '-') + '-' + $json.DocNumber + '.html' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {},
+        "includeOtherFields": true
+      },
+      "id": "2fe51bc3-2ac6-459c-a60d-5e3b65bc8c76",
+      "name": "בניית HTML",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        960,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "16a749d1-83b5-4ea6-a931-f87be43f5c01",
+              "name": "fileBase64",
+              "value": "={{ $json.html.base64Encode() }}",
+              "type": "string"
+            },
+            {
+              "id": "0527770e-dbd2-4af6-84e6-a1aa22364c04",
+              "name": "fileName",
+              "value": "={{ $json.fileName }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "8e2dc118-0ab4-4e62-a4a7-7237e98909d5",
+      "name": "Encode HTML As Base64",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1200,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "toBinary",
+        "sourceProperty": "fileBase64",
+        "binaryPropertyName": "data",
+        "options": {
+          "fileName": "={{ $json.fileName }}",
+          "mimeType": "text/html"
+        }
+      },
+      "id": "f703cfc2-5df4-454a-89d5-db780e770d90",
+      "name": "Convert To HTML File",
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [
+        1440,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "resource": "file",
+        "operation": "upload",
+        "inputDataFieldName": "data",
+        "name": "={{ $('בניית HTML').first().json.fileName }}",
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "My Drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "root",
+          "cachedResultName": "/ (Root folder)"
+        },
+        "options": {}
+      },
+      "id": "f71fb8fe-bd18-4650-88d8-35434985b648",
+      "name": "Upload To Google Drive",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        1680,
+        300
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "khzDrive0000001",
+          "name": "Google Drive - Kilohertz Docs"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "airtableTokenApi",
+        "resource": "record",
+        "operation": "update",
+        "base": {
+          "__rl": true,
+          "mode": "id",
+          "value": "appXXXXXXXXXXXXXX"
+        },
+        "table": {
+          "__rl": true,
+          "mode": "id",
+          "value": "Invoices"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "id": "={{ $('Prepare Document Data').first().json.recordId }}",
+            "InvoiceNumber": "={{ $('Prepare Document Data').first().json.DocNumber }}",
+            "PdfUrl": "={{ $json.webViewLink }}",
+            "Status": "Done"
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": false
+            },
+            {
+              "id": "InvoiceNumber",
+              "displayName": "InvoiceNumber",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "PdfUrl",
+              "displayName": "PdfUrl",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "9805ade4-35b7-4f8c-b7c4-8d9e472f734a",
+      "name": "Save Number And Link",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.2,
+      "position": [
+        1920,
+        300
+      ],
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "khzAirtable0001",
+          "name": "Airtable - Kilohertz"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Every Minute": {
+      "main": [
+        [
+          {
+            "node": "Find Pending Invoice",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Pending Invoice": {
+      "main": [
+        [
+          {
+            "node": "Find Last Number Of Type",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Last Number Of Type": {
+      "main": [
+        [
+          {
+            "node": "Prepare Document Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Document Data": {
+      "main": [
+        [
+          {
+            "node": "בניית HTML",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "בניית HTML": {
+      "main": [
+        [
+          {
+            "node": "Encode HTML As Base64",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Encode HTML As Base64": {
+      "main": [
+        [
+          {
+            "node": "Convert To HTML File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convert To HTML File": {
+      "main": [
+        [
+          {
+            "node": "Upload To Google Drive",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload To Google Drive": {
+      "main": [
+        [
+          {
+            "node": "Save Number And Link",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": []
+}
