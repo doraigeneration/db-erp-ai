@@ -1,0 +1,1370 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>קילוהרץ · לוח בקרה</title>
+<meta name="description" content="לקוח ייחוס למערכת ERP-AI של קילוהרץ אלקטרוניקה — מתחבר ל-Webhook של WF13 ב-n8n, או רץ במצב הדגמה עם נתונים לדוגמה.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;600;700&family=Heebo:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+/* ===== Tokens — "lab bench": PCB solder-mask green, signal-amber LEDs, phosphor screen ===== */
+:root{
+  --bench:#ECEFEA;      /* page: pale bench grey */
+  --surface:#FFFFFF;
+  --surface-2:#F5F7F4;
+  --ink:#14201B;
+  --ink-2:#3B4742;
+  --muted:#56625C;
+  --line:#D3DAD4;
+  --line-2:#E5EAE6;
+  --pcb:#0B6E4F;        /* primary: solder mask */
+  --pcb-deep:#084D38;
+  --pcb-tint:#E2EFE8;
+  --board:#0F3A2D;      /* sidebar: bare board */
+  --board-2:#174A3B;
+  --amber:#E9A21A;      /* signal LED */
+  --amber-tint:#FCF1D8;
+  --amber-ink:#6E4A00;
+  --red:#B3312A;
+  --red-tint:#FAE8E6;
+  --blue:#2356A5;
+  --blue-tint:#E5EDF8;
+  --grey-tint:#ECEEEC;
+  --screen:#E3EEE6;     /* oscilloscope phosphor (light) */
+  --grat:#C2D5C8;
+  --grat-strong:#9DBBA8;
+  --font-display:"Heebo", "Segoe UI", system-ui, sans-serif;
+  --font-body:"Assistant", "Segoe UI", system-ui, sans-serif;
+  --font-mono:ui-monospace, "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
+  --r-sm:6px; --r:10px; --r-lg:14px;
+  --shadow:0 1px 0 rgba(20,32,27,.04), 0 6px 20px -12px rgba(20,32,27,.25);
+  --focus:0 0 0 2px var(--surface), 0 0 0 4px var(--pcb);
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{
+  background:var(--bench); color:var(--ink);
+  font-family:var(--font-body); font-size:16px; line-height:1.5;
+  -webkit-font-smoothing:antialiased;
+  overflow-x:hidden;
+}
+button,input,select,textarea{font:inherit;color:inherit}
+a{color:var(--pcb-deep)}
+.num,.mono{font-variant-numeric:tabular-nums}
+.mono{font-family:var(--font-mono);font-size:.86em;letter-spacing:0}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+:focus-visible{outline:none;box-shadow:var(--focus);border-radius:var(--r-sm)}
+svg.i{width:20px;height:20px;flex:none;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.skip{position:absolute;inset-inline-start:12px;top:-60px;background:var(--ink);color:#fff;padding:8px 14px;border-radius:var(--r-sm);z-index:100}
+.skip:focus{top:12px}
+
+/* ===== Shell ===== */
+.app{display:grid;grid-template-columns:236px minmax(0,1fr);min-height:100vh;background:linear-gradient(to left,var(--board) 236px,transparent 236px)}
+.side{
+  background:var(--board); color:#D4E5DB;
+  position:sticky; top:0; height:100vh;
+  display:flex; flex-direction:column; padding:22px 14px 18px;
+}
+.brand{display:flex;align-items:center;gap:10px;padding:0 8px 22px;border-bottom:1px solid rgba(255,255,255,.08);margin-bottom:14px}
+.brand-mark{width:38px;height:38px;border-radius:9px;background:var(--board-2);display:grid;place-items:center;color:var(--amber);box-shadow:inset 0 0 0 1px rgba(233,162,26,.35)}
+.brand-mark svg{width:26px;height:26px;stroke-width:2}
+.brand-name{font-family:var(--font-display);font-weight:800;font-size:20px;line-height:1.1;color:#fff;letter-spacing:-.01em}
+.brand-sub{font-size:13px;color:#9EBDAD}
+.nav{display:flex;flex-direction:column;gap:2px}
+.nav button{
+  all:unset; box-sizing:border-box; cursor:pointer;
+  display:flex; align-items:center; gap:12px;
+  padding:10px 12px; border-radius:8px; font-weight:600; font-size:16px; color:#C9DDD1;
+  position:relative;
+}
+.nav button:hover{background:rgba(255,255,255,.05);color:#fff}
+.nav button[aria-current="page"]{background:rgba(255,255,255,.08);color:#fff}
+.nav button[aria-current="page"]::before{
+  content:""; position:absolute; inset-inline-start:-14px; top:9px; bottom:9px; width:3px;
+  background:var(--amber); border-radius:0 3px 3px 0;
+}
+.nav button:focus-visible{box-shadow:0 0 0 2px var(--amber)}
+.nav .count{margin-inline-start:auto;font-family:var(--font-mono);font-size:12px;color:#9EBDAD}
+.side-foot{margin-top:auto;padding:14px 8px 0;border-top:1px solid rgba(255,255,255,.08);font-size:13px;color:#9EBDAD}
+.side-foot .mono{color:#D4E5DB;display:block;margin-top:2px;word-break:break-all}
+
+.main{min-width:0;display:flex;flex-direction:column}
+.top{
+  display:flex; align-items:center; gap:16px; flex-wrap:wrap;
+  padding:22px 32px 18px;
+}
+.top-title{margin-inline-end:auto;min-width:0}
+.eyebrow{font-size:13px;font-weight:600;color:var(--muted);letter-spacing:.01em}
+h1{font-family:var(--font-display);font-weight:800;font-size:30px;line-height:1.15;margin:2px 0 0;letter-spacing:-.015em}
+.top-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.content{padding:4px 32px 48px;max-width:1360px;width:100%}
+
+/* ===== Controls ===== */
+.btn{
+  display:inline-flex; align-items:center; justify-content:center; gap:8px;
+  min-height:40px; padding:0 16px; border-radius:var(--r-sm);
+  border:1px solid var(--line); background:var(--surface); color:var(--ink);
+  font-weight:700; font-size:15px; cursor:pointer; white-space:nowrap;
+  transition:background .15s, border-color .15s;
+}
+.btn:hover{background:var(--surface-2);border-color:#BFC9C2}
+.btn.primary{background:var(--pcb);border-color:var(--pcb);color:#fff}
+.btn.primary:hover{background:var(--pcb-deep);border-color:var(--pcb-deep)}
+.btn.ghost{background:transparent;border-color:transparent}
+.btn.ghost:hover{background:rgba(20,32,27,.06)}
+.btn.icon{padding:0;width:40px}
+.btn[disabled]{opacity:.55;cursor:progress}
+.btn .i{width:18px;height:18px}
+
+.badge-mode{
+  display:inline-flex;align-items:center;gap:8px;height:32px;padding:0 12px;border-radius:999px;
+  font-size:14px;font-weight:700;border:1px solid transparent;cursor:pointer;background:none;
+}
+.badge-mode.demo{background:var(--amber-tint);color:var(--amber-ink);border-color:#EED29A}
+.badge-mode.live{background:var(--pcb-tint);color:var(--pcb-deep);border-color:#B7D6C5}
+.led{width:8px;height:8px;border-radius:50%;background:currentColor;flex:none;box-shadow:0 0 0 3px color-mix(in srgb, currentColor 18%, transparent)}
+.badge-mode.demo .led{background:var(--amber);animation:blink 2.4s ease-in-out infinite}
+@keyframes blink{50%{opacity:.35}}
+
+/* ===== Cards ===== */
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);box-shadow:var(--shadow);min-width:0}
+.card-h{display:flex;align-items:baseline;gap:12px;padding:16px 20px 0}
+.card-h h2{font-family:var(--font-display);font-size:17px;font-weight:800;margin:0;letter-spacing:-.005em}
+.card-h .meta{margin-inline-start:auto;font-size:14px;color:var(--muted)}
+.card-b{padding:14px 20px 20px}
+.linkbtn{all:unset;cursor:pointer;color:var(--pcb-deep);font-weight:700;font-size:14px;margin-inline-start:auto;border-radius:4px}
+.linkbtn:hover{text-decoration:underline}
+.linkbtn:focus-visible{box-shadow:var(--focus)}
+
+/* ===== Dashboard ===== */
+.dash{display:grid;grid-template-columns:minmax(0,1.9fr) minmax(0,1fr);gap:18px}
+.dash-row2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1.25fr);gap:18px;margin-top:18px}
+
+/* Signature: the revenue oscilloscope */
+.scope .card-h{align-items:flex-end;flex-wrap:wrap;row-gap:4px}
+.readout-label{font-size:14px;font-weight:600;color:var(--muted)}
+.readout-big{font-family:var(--font-display);font-weight:800;font-size:44px;line-height:1;letter-spacing:-.02em;font-variant-numeric:tabular-nums;margin-top:6px}
+.scope-legend{margin-inline-start:auto;font-size:14px;color:var(--muted);text-align:end}
+.bezel{
+  margin:16px 20px 0; padding:10px; border-radius:12px;
+  background:linear-gradient(#F0F3EF,#E6EAE5); border:1px solid var(--line);
+}
+.screen{
+  position:relative; height:232px; border-radius:7px; overflow:hidden;
+  background:var(--screen);
+  box-shadow:inset 0 0 0 1px #B9CEBF, inset 0 2px 10px rgba(11,110,79,.10);
+}
+.screen svg{position:absolute;inset:0;width:100%;height:100%;display:block}
+.screen .tag{
+  position:absolute; top:8px; font-family:var(--font-mono); font-size:11.5px; color:#2F5A47;
+  background:rgba(227,238,230,.85); padding:1px 6px; border-radius:4px; pointer-events:none;
+}
+.screen .tag.l{left:10px} .screen .tag.r{right:10px}
+.scope-axis{position:relative;height:30px;margin:0 20px;direction:ltr}
+.scope-axis span{position:absolute;top:6px;transform:translateX(-50%);font-family:var(--font-mono);font-size:12px;color:var(--muted)}
+.scope-foot{padding:2px 20px 18px;font-size:14px;color:var(--muted)}
+.tip{
+  position:absolute; pointer-events:none; z-index:2; direction:rtl;
+  background:var(--ink); color:#fff; border-radius:6px; padding:6px 10px; font-size:13.5px; line-height:1.35;
+  white-space:nowrap; transform:translate(-50%,-115%); opacity:0; transition:opacity .1s;
+}
+.tip b{font-variant-numeric:tabular-nums}
+
+.readouts{display:grid;gap:18px;grid-template-rows:repeat(3,1fr)}
+.readout{padding:16px 20px;display:flex;flex-direction:column;justify-content:center;gap:2px}
+.readout .row{display:flex;align-items:center;gap:8px}
+.readout .val{font-family:var(--font-display);font-weight:800;font-size:32px;line-height:1.1;letter-spacing:-.015em;font-variant-numeric:tabular-nums}
+.readout .val small{font-size:16px;font-weight:600;color:var(--muted);margin-inline-start:6px;letter-spacing:0}
+.readout .sub{font-size:14px;color:var(--muted)}
+.readout .led{width:9px;height:9px}
+
+.bars{list-style:none;margin:0;padding:0;display:grid;gap:14px}
+.bars li{display:grid;grid-template-columns:96px minmax(0,1fr) 34px;align-items:center;gap:10px;font-size:15px}
+.bars .track{display:block;height:12px;background:var(--surface-2);border-radius:3px;overflow:hidden;box-shadow:inset 0 0 0 1px var(--line-2)}
+.bars .fill{display:block;height:100%;background:var(--pcb);border-start-end-radius:4px;border-end-end-radius:4px;min-width:2px}
+.bars .fill.mutedfill{background:#9AA59F}
+.bars .n{font-weight:700;text-align:left;font-variant-numeric:tabular-nums}
+
+.pipe{display:grid;gap:4px}
+.pipe-node{border:1px solid var(--line);border-radius:var(--r);padding:8px 12px;background:var(--surface-2);display:flex;align-items:center;justify-content:space-between;gap:8px;min-width:0}
+.pipe-node .k{font-family:var(--font-display);font-weight:800;font-size:22px;line-height:1.1;font-variant-numeric:tabular-nums}
+.pipe-split{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.pipe-arrow{color:#98A59D;display:flex;justify-content:center;height:18px}
+.pipe-arrow svg{width:16px;height:16px}
+.pipe-note{margin:14px 0 0;font-size:14px;color:var(--muted)}
+
+.tasklist{list-style:none;margin:0;padding:0}
+.tasklist li{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:10px;align-items:start;padding:11px 0;border-top:1px solid var(--line-2)}
+.tasklist li:first-child{border-top:0;padding-top:2px}
+.tasklist .t{font-weight:600;line-height:1.35}
+.tasklist .s{font-size:13px;color:var(--muted)}
+.tasklist .due{font-size:13.5px;color:var(--ink-2);text-align:left;white-space:nowrap}
+.tasklist .due.late{color:var(--red);font-weight:700}
+.prio{width:4px;align-self:stretch;border-radius:2px;background:#C5CEC8}
+.prio.p-high{background:var(--red)} .prio.p-norm{background:var(--blue)}
+
+/* ===== Status chips ===== */
+.chip{display:inline-flex;align-items:center;gap:7px;padding:3px 10px 3px 10px;border-radius:999px;font-size:13.5px;font-weight:700;white-space:nowrap;border:1px solid transparent}
+.chip .led{width:7px;height:7px;box-shadow:none}
+.c-blue{background:var(--blue-tint);color:var(--blue);border-color:#C9D8EF}
+.c-amber{background:var(--amber-tint);color:var(--amber-ink);border-color:#EED29A}
+.c-amber .led{background:var(--amber)}
+.c-red{background:var(--red-tint);color:var(--red);border-color:#F0C6C1}
+.c-green{background:var(--pcb-tint);color:var(--pcb-deep);border-color:#BCD9C9}
+.c-grey{background:var(--grey-tint);color:var(--muted);border-color:#D9DED9}
+.ptag{font-size:13px;font-weight:700;padding:2px 8px;border-radius:4px;white-space:nowrap}
+.ptag.p-high{background:var(--red-tint);color:var(--red)}
+.ptag.p-norm{background:var(--blue-tint);color:var(--blue)}
+.ptag.p-low{background:var(--grey-tint);color:var(--muted)}
+
+/* ===== Table views ===== */
+.toolbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:16px 18px;border-bottom:1px solid var(--line)}
+.field-search{position:relative;flex:1 1 260px;max-width:380px}
+.field-search .i{position:absolute;inset-inline-start:11px;top:50%;transform:translateY(-50%);color:var(--muted);width:18px;height:18px}
+.input,.select,.textarea{
+  width:100%; min-height:40px; padding:8px 12px; border-radius:var(--r-sm);
+  border:1px solid #C3CCC5; background:var(--surface);
+}
+.textarea{min-height:76px;resize:vertical}
+.field-search .input{padding-inline-start:36px}
+.input:focus,.select:focus,.textarea:focus{outline:none;border-color:var(--pcb);box-shadow:0 0 0 3px rgba(11,110,79,.18)}
+.toolbar .select{width:auto;min-width:150px}
+.toolbar .count{font-size:14px;color:var(--muted);margin-inline-start:auto}
+.tablewrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:15px}
+thead th{
+  text-align:start; font-weight:700; font-size:13px; color:var(--muted);
+  padding:10px 14px; background:var(--surface-2); border-bottom:1px solid var(--line); white-space:nowrap;
+}
+tbody td{padding:12px 14px;border-bottom:1px solid var(--line-2);vertical-align:middle}
+tbody tr:last-child td{border-bottom:0}
+tbody tr:hover{background:#FAFBF9}
+th.n,td.n{text-align:left;font-variant-numeric:tabular-nums;white-space:nowrap}
+td .sub{display:block;font-size:13px;color:var(--muted)}
+td .strong{font-weight:700}
+.doclink{display:inline-flex;align-items:center;gap:6px;font-weight:700;text-decoration:none;border-radius:4px;white-space:nowrap}
+.doclink:hover{text-decoration:underline}
+.doclink .i{width:15px;height:15px}
+.dim{color:var(--muted)}
+.empty,.state{padding:44px 20px;text-align:center;color:var(--muted)}
+.state strong{display:block;color:var(--ink);font-size:17px;margin-bottom:4px;font-family:var(--font-display)}
+.state.err strong{color:var(--red)}
+.state .btn{margin-top:14px}
+.skel{height:14px;border-radius:4px;background:linear-gradient(90deg,var(--line-2),#F3F5F2,var(--line-2));background-size:200% 100%;animation:sk 1.2s linear infinite}
+@keyframes sk{to{background-position:-200% 0}}
+.stock{display:inline-flex;align-items:center;gap:7px;font-weight:600;font-size:14px}
+.stock .led{width:8px;height:8px;box-shadow:none}
+.stock.in{color:var(--pcb-deep)} .stock.out{color:var(--red)}
+
+/* ===== Dialogs ===== */
+dialog.modal{
+  border:0; padding:0; border-radius:var(--r-lg); width:min(620px, calc(100vw - 24px));
+  max-height:calc(100vh - 32px); background:var(--surface); color:var(--ink);
+  box-shadow:0 30px 80px -20px rgba(10,30,22,.45);
+}
+dialog.modal::backdrop{background:rgba(15,38,30,.45)}
+.modal form{display:flex;flex-direction:column;max-height:calc(100vh - 32px)}
+.modal-h{display:flex;align-items:center;gap:10px;padding:18px 22px;border-bottom:1px solid var(--line)}
+.modal-h h2{font-family:var(--font-display);font-weight:800;font-size:20px;margin:0}
+.modal-h .btn{margin-inline-start:auto}
+.modal-b{padding:18px 22px;overflow-y:auto}
+.modal-f{display:flex;gap:10px;justify-content:flex-start;padding:14px 22px;border-top:1px solid var(--line);background:var(--surface-2);border-radius:0 0 var(--r-lg) var(--r-lg)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px 16px}
+.full{grid-column:1/-1}
+.fld label{display:block;font-weight:700;font-size:14.5px;margin-bottom:5px}
+.fld .req{color:var(--red)}
+.fld .hint{font-size:13px;color:var(--muted);margin-top:4px}
+.fld [dir="ltr"]{text-align:left}
+.formerr{margin:0 0 14px;padding:10px 12px;border-radius:var(--r-sm);background:var(--red-tint);color:var(--red);font-weight:600;font-size:14.5px}
+.formerr:empty{display:none}
+.vat{
+  margin-top:16px;border:1px dashed #A9C4B4;border-radius:var(--r);padding:12px 14px;background:#F4F9F6;
+  display:grid;grid-template-columns:repeat(3,1fr);gap:8px;
+}
+.vat .k{font-size:13px;color:var(--muted)}
+.vat .v{font-family:var(--font-display);font-weight:800;font-size:19px;font-variant-numeric:tabular-nums}
+.vat .note{grid-column:1/-1;font-size:13px;color:var(--muted)}
+.warn{
+  display:flex;gap:10px;padding:12px 14px;border-radius:var(--r);background:var(--amber-tint);
+  border:1px solid #EED29A;color:#4F3600;font-size:14.5px;margin-bottom:16px
+}
+.warn .i{color:var(--amber-ink);margin-top:2px}
+.warn p{margin:0}
+.keyrow{display:flex;gap:8px}
+.testres{margin-top:12px;font-size:14.5px;font-weight:600}
+.testres.ok{color:var(--pcb-deep)} .testres.bad{color:var(--red)}
+
+/* ===== Chat drawer ===== */
+.scrim{position:fixed;inset:0;background:rgba(15,38,30,.35);opacity:0;pointer-events:none;transition:opacity .2s;z-index:40}
+.scrim.on{opacity:1;pointer-events:auto}
+.drawer{
+  position:fixed; top:0; bottom:0; left:0; width:min(420px,100vw); z-index:41;
+  background:var(--surface); box-shadow:20px 0 60px -20px rgba(10,30,22,.35);
+  display:flex; flex-direction:column; transform:translateX(-104%); transition:transform .25s ease;
+  visibility:hidden;
+}
+.drawer.on{transform:none;visibility:visible}
+.drawer-h{display:flex;align-items:center;gap:12px;padding:16px 18px;border-bottom:1px solid var(--line);background:var(--board);color:#fff}
+.drawer-h h2{font-family:var(--font-display);font-size:18px;font-weight:800;margin:0}
+.drawer-h .s{font-size:12.5px;color:#9EBDAD}
+.drawer-h .btn{margin-inline-start:auto;color:#fff}
+.drawer-h .btn:hover{background:rgba(255,255,255,.1)}
+.drawer-h .btn:focus-visible{box-shadow:0 0 0 2px var(--amber)}
+.msgs{flex:1;overflow-y:auto;padding:18px;display:flex;flex-direction:column;gap:12px;background:var(--surface-2)}
+.msg{max-width:86%;padding:10px 14px;border-radius:14px;white-space:pre-wrap;word-wrap:break-word;font-size:15.5px;line-height:1.55}
+.msg.me{align-self:flex-start;background:var(--pcb);color:#fff;border-start-start-radius:4px}
+.msg.bot{align-self:flex-end;background:var(--surface);border:1px solid var(--line);border-start-end-radius:4px}
+.msg.err{background:var(--red-tint);border-color:#F0C6C1;color:var(--red)}
+.msg .who{display:block;font-size:12px;font-weight:700;color:var(--muted);margin-bottom:2px}
+.typing{display:inline-flex;gap:4px;padding:4px 0}
+.typing i{width:7px;height:7px;border-radius:50%;background:#8FA197;animation:ty 1s infinite}
+.typing i:nth-child(2){animation-delay:.15s}.typing i:nth-child(3){animation-delay:.3s}
+@keyframes ty{40%{transform:translateY(-4px);opacity:.5}}
+.suggest{display:flex;flex-wrap:wrap;gap:8px}
+.suggest button{all:unset;cursor:pointer;font-size:14px;font-weight:600;padding:6px 12px;border-radius:999px;border:1px solid #BCD9C9;background:var(--surface);color:var(--pcb-deep)}
+.suggest button:hover{background:var(--pcb-tint)}
+.suggest button:focus-visible{box-shadow:var(--focus)}
+.composer{display:flex;gap:8px;padding:12px;border-top:1px solid var(--line);background:var(--surface)}
+.composer .textarea{min-height:44px;max-height:140px;resize:none}
+.composer .btn .i{transform:scaleX(-1)}
+
+/* ===== Toast ===== */
+.toasts{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:60;display:grid;gap:8px;width:max-content;max-width:calc(100vw - 32px)}
+.toast{background:var(--ink);color:#fff;padding:10px 16px;border-radius:8px;font-weight:600;font-size:15px;box-shadow:var(--shadow);animation:tin .2s ease}
+.toast.bad{background:var(--red)}
+@keyframes tin{from{opacity:0;transform:translateY(6px)}}
+
+[hidden]{display:none !important}
+
+/* ===== Responsive ===== */
+@media (max-width:1180px){
+  .dash{grid-template-columns:1fr}
+  .readouts{grid-template-columns:repeat(3,minmax(0,1fr));grid-template-rows:none}
+  .dash-row2{grid-template-columns:1fr 1fr}
+  .dash-row2 .tasks-card{grid-column:1/-1}
+}
+@media (max-width:860px){
+  .app{grid-template-columns:1fr;background:none}
+  .side{
+    position:fixed; top:auto; bottom:0; left:0; right:0; height:auto; z-index:30;
+    padding:6px 6px calc(6px + env(safe-area-inset-bottom)); flex-direction:row;
+    box-shadow:0 -6px 20px -10px rgba(0,0,0,.35);
+  }
+  .brand,.side-foot{display:none}
+  .nav{flex-direction:row;width:100%;gap:0}
+  .nav button{flex:1;flex-direction:column;gap:3px;padding:7px 2px;font-size:12.5px;text-align:center;justify-content:center}
+  .nav button[aria-current="page"]::before{inset-inline-start:25%;inset-inline-end:25%;top:-6px;bottom:auto;width:auto;height:3px;border-radius:0 0 3px 3px}
+  .nav .count{display:none}
+  .main{padding-bottom:78px}
+  .top{padding:16px 16px 12px;gap:10px}
+  h1{font-size:25px}
+  .content{padding:4px 16px 32px}
+  .btn-label{display:none}
+  .btn.chat-btn{width:40px;padding:0}
+}
+@media (max-width:720px){
+  .readouts{grid-template-columns:1fr 1fr}
+  .readouts .readout:first-child{grid-column:1/-1}
+  .dash-row2{grid-template-columns:1fr}
+  .readout-big{font-size:36px}
+  .screen{height:190px}
+  .bezel{margin:14px 14px 0;padding:7px}
+  .scope-axis{margin:0 14px}
+  .card-h{padding:14px 16px 0}.card-b{padding:12px 16px 16px}.scope-foot{padding:2px 16px 16px}
+  .grid2{grid-template-columns:1fr}
+  .vat{grid-template-columns:1fr 1fr 1fr}
+  .toolbar{padding:14px}
+  .field-search{max-width:none;flex-basis:100%}
+  .toolbar .select{flex:1}
+  .toolbar .count{flex-basis:100%;margin:0}
+  /* table → cards */
+  table.cards thead{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+  table.cards tbody tr{display:block;padding:12px 14px;border-bottom:1px solid var(--line)}
+  table.cards tbody tr:last-child{border-bottom:0}
+  table.cards tbody td{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:5px 0;border:0;text-align:start}
+  table.cards tbody td::before{content:attr(data-label);font-size:13px;font-weight:700;color:var(--muted);flex:none}
+  table.cards tbody td.n{text-align:start}
+  table.cards tbody td > *:not(.chip):not(.ptag):not(.stock){text-align:left}
+  table.cards tbody td.lead-cell{display:block;padding-bottom:8px}
+  table.cards tbody td.lead-cell::before{display:none}
+  table.cards tbody td.lead-cell > *{text-align:start}
+  .modal-b{padding:16px}
+  .modal-h,.modal-f{padding-inline:16px}
+}
+@media (max-width:520px){
+  .top-actions{gap:4px}
+  .badge-mode{padding:0 10px}
+  .mode-long{display:none}
+  .eyebrow{font-size:12px}
+}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation:none !important;transition:none !important}
+}
+</style>
+</head>
+<body>
+<a class="skip" href="#content">דילוג לתוכן</a>
+<div class="app">
+  <aside class="side" aria-label="ניווט ראשי">
+    <div class="brand">
+      <div class="brand-mark" aria-hidden="true"><svg class="i" viewBox="0 0 24 24"><path d="M2 12c2 0 2-7 4-7s2 14 4 14 2-14 4-14 2 14 4 14 2-7 4-7"/></svg></div>
+      <div><div class="brand-name">קילוהרץ</div><div class="brand-sub">לוח בקרה · ERP-AI</div></div>
+    </div>
+    <nav class="nav" id="nav"></nav>
+    <div class="side-foot">
+      <span id="footMode">מצב הדגמה</span>
+      <span class="mono" id="footEndpoint">POST /webhook/kilohertz/app</span>
+    </div>
+  </aside>
+
+  <div class="main">
+    <header class="top">
+      <div class="top-title">
+        <div class="eyebrow">קילוהרץ אלקטרוניקה</div>
+        <h1 id="pageTitle">דשבורד</h1>
+      </div>
+      <div class="top-actions">
+        <button class="badge-mode demo" id="modeBadge" type="button" aria-label="מצב חיבור — פתיחת הגדרות"><span class="led"></span><span id="modeText"><span class="mode-long">מצב </span>הדגמה</span></button>
+        <button class="btn icon ghost" id="refreshAll" type="button" aria-label="רענון נתונים" title="רענון נתונים"><svg class="i" viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7"/></svg></button>
+        <button class="btn icon ghost" id="openSettings" type="button" aria-label="הגדרות חיבור" title="הגדרות חיבור"><svg class="i" viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M16 5v4M4 17h4M12 17h8M10 15v4"/></svg></button>
+        <button class="btn primary chat-btn" id="openChat" type="button" aria-label="שיחה עם הסוכן"><svg class="i" viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"/></svg><span class="btn-label">שיחה עם הסוכן</span></button>
+      </div>
+    </header>
+
+    <main class="content" id="content" tabindex="-1">
+      <!-- Dashboard -->
+      <section id="view-dashboard" data-view aria-labelledby="pageTitle">
+        <div class="dash">
+          <article class="card scope" aria-labelledby="scopeTitle">
+            <div class="card-h">
+              <div>
+                <div class="readout-label" id="scopeTitle">הכנסות החודש · מסמכים שהופקו</div>
+                <div class="readout-big num" id="kpiRevenue">—</div>
+              </div>
+              <div class="scope-legend" id="scopeLegend"></div>
+            </div>
+            <div class="bezel">
+              <div class="screen" id="scope">
+                <span class="tag l" id="scopeScale"></span>
+                <span class="tag r">הכנסה מצטברת</span>
+                <div class="tip" id="scopeTip" role="status"></div>
+              </div>
+            </div>
+            <div class="scope-axis" id="scopeAxis" aria-hidden="true"></div>
+            <div class="scope-foot" id="scopeFoot"></div>
+          </article>
+
+          <div class="readouts">
+            <article class="card readout" aria-labelledby="kOpenL">
+              <div class="row"><span class="led" style="color:var(--amber)"></span><span class="readout-label" id="kOpenL">חשבוניות פתוחות</span></div>
+              <div class="val" id="kpiOpen">—</div>
+              <div class="sub" id="kpiOpenSub">&nbsp;</div>
+            </article>
+            <article class="card readout" aria-labelledby="kLeadL">
+              <div class="row"><span class="led" style="color:var(--blue)"></span><span class="readout-label" id="kLeadL">לידים חדשים</span></div>
+              <div class="val" id="kpiLeads">—</div>
+              <div class="sub" id="kpiLeadsSub">&nbsp;</div>
+            </article>
+            <article class="card readout" aria-labelledby="kTaskL">
+              <div class="row"><span class="led" style="color:var(--pcb)"></span><span class="readout-label" id="kTaskL">משימות פתוחות</span></div>
+              <div class="val" id="kpiTasks">—</div>
+              <div class="sub" id="kpiTasksSub">&nbsp;</div>
+            </article>
+          </div>
+        </div>
+
+        <div class="dash-row2">
+          <article class="card" aria-labelledby="leadsByStatusT">
+            <div class="card-h"><h2 id="leadsByStatusT">לידים לפי סטטוס</h2><span class="meta" id="leadsTotal"></span></div>
+            <div class="card-b"><ul class="bars" id="leadBars"></ul></div>
+          </article>
+          <article class="card" aria-labelledby="pipeT">
+            <div class="card-h"><h2 id="pipeT">מסלול החשבוניות</h2><button class="linkbtn" type="button" data-goto="invoices">לכל החשבוניות</button></div>
+            <div class="card-b">
+              <div class="pipe" id="pipe"></div>
+              <p class="pipe-note">חשבונית חדשה עוברת אימות ב-WF01, ואחרי הפקת המסמך ב-WF08 היא מסומנת כ״הופק״.</p>
+            </div>
+          </article>
+          <article class="card tasks-card" aria-labelledby="openTasksT">
+            <div class="card-h"><h2 id="openTasksT">משימות פתוחות</h2><button class="linkbtn" type="button" data-goto="tasks">לכל המשימות</button></div>
+            <div class="card-b"><ul class="tasklist" id="openTasks"></ul></div>
+          </article>
+        </div>
+      </section>
+
+      <!-- Table views are generated -->
+      <div id="tableViews"></div>
+    </main>
+  </div>
+</div>
+
+<!-- Chat drawer -->
+<div class="scrim" id="scrim"></div>
+<aside class="drawer" id="drawer" role="dialog" aria-modal="true" aria-labelledby="chatTitle">
+  <div class="drawer-h">
+    <div>
+      <h2 id="chatTitle">הסוכן של קילוהרץ</h2>
+      <div class="s">שיחה <span class="mono" id="sessionLabel"></span></div>
+    </div>
+    <button class="btn icon ghost" id="closeChat" type="button" aria-label="סגירת השיחה"><svg class="i" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+  </div>
+  <div class="msgs" id="msgs" aria-live="polite"></div>
+  <form class="composer" id="chatForm">
+    <label class="sr-only" for="chatInput">הודעה לסוכן</label>
+    <textarea class="textarea" id="chatInput" rows="1" placeholder="כתבו שאלה לסוכן…" required></textarea>
+    <button class="btn primary icon" type="submit" id="chatSend" aria-label="שליחה"><svg class="i" viewBox="0 0 24 24"><path d="M21 3 3 10l7 3 3 7zM10 13 21 3"/></svg></button>
+  </form>
+</aside>
+
+<!-- Settings -->
+<dialog class="modal" id="dlgSettings" aria-labelledby="setT">
+  <form id="settingsForm" novalidate>
+    <div class="modal-h"><h2 id="setT">הגדרות חיבור ל-n8n</h2><button class="btn icon ghost" type="button" data-close aria-label="סגירה"><svg class="i" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+    <div class="modal-b">
+      <div class="warn" role="note">
+        <svg class="i" viewBox="0 0 24 24"><path d="M12 3 2 20h20zM12 10v4M12 17v.5"/></svg>
+        <p><strong>זהו לקוח ייחוס מקומי בלבד.</strong> המפתח נשמר רק בלשונית הזו (sessionStorage) ונמחק כשסוגרים אותה. באפליקציה אמיתית אסור לשים את המפתח בדפדפן — הוא חייב לשבת בצד השרת: Edge Function ב-Lovable או Secret ב-Base44, שמעבירים את הבקשה ל-n8n.</p>
+      </div>
+      <p class="formerr" id="setErr" role="alert"></p>
+      <div class="grid2">
+        <div class="fld full">
+          <label for="setUrl">כתובת ה-Webhook של WF13</label>
+          <input class="input" id="setUrl" type="url" dir="ltr" inputmode="url" autocomplete="off" placeholder="https://your-name.app.n8n.cloud/webhook/kilohertz/app">
+          <div class="hint">השאירו ריק כדי לעבוד במצב הדגמה עם נתונים לדוגמה.</div>
+        </div>
+        <div class="fld full">
+          <label for="setKey">מפתח API (נשלח בכותרת x-api-key)</label>
+          <div class="keyrow">
+            <input class="input" id="setKey" type="password" dir="ltr" autocomplete="off" spellcheck="false">
+            <button class="btn" type="button" id="toggleKey" aria-pressed="false">הצגה</button>
+          </div>
+        </div>
+      </div>
+      <div class="testres" id="testRes" role="status"></div>
+    </div>
+    <div class="modal-f">
+      <button class="btn primary" type="submit">שמירה והתחברות</button>
+      <button class="btn" type="button" id="testConn">בדיקת חיבור</button>
+      <button class="btn ghost" type="button" id="goDemo">חזרה למצב הדגמה</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- New invoice -->
+<dialog class="modal" id="dlgInvoice" aria-labelledby="invT">
+  <form id="invoiceForm" novalidate>
+    <div class="modal-h"><h2 id="invT">חשבונית חדשה</h2><button class="btn icon ghost" type="button" data-close aria-label="סגירה"><svg class="i" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+    <div class="modal-b">
+      <p class="formerr" role="alert"></p>
+      <div class="grid2">
+        <div class="fld"><label for="iType">סוג מסמך <span class="req" aria-hidden="true">*</span></label>
+          <select class="select" id="iType" name="DocType" required><option>חשבונית מס</option><option>חשבונית</option><option>קבלה</option></select></div>
+        <div class="fld"><label for="iDate">תאריך הנפקה <span class="req" aria-hidden="true">*</span></label>
+          <input class="input" id="iDate" name="IssueDate" type="date" required></div>
+        <div class="fld"><label for="iAmount">סכום לפני מע״מ (₪) <span class="req" aria-hidden="true">*</span></label>
+          <input class="input" id="iAmount" name="Amount" type="number" min="0.01" step="0.01" inputmode="decimal" dir="ltr" required></div>
+        <div class="fld"><label for="iCid">מספר לקוח <span class="req" aria-hidden="true">*</span></label>
+          <input class="input" id="iCid" name="CustomerId" dir="ltr" placeholder="CUST-0001" pattern="CUST-\d{4}" required aria-describedby="iCidH"><div class="hint" id="iCidH">בפורמט CUST-0001</div></div>
+        <div class="fld"><label for="iName">שם הלקוח <span class="req" aria-hidden="true">*</span></label>
+          <input class="input" id="iName" name="CustomerName" required autocomplete="off"></div>
+        <div class="fld"><label for="iEmail">מייל הלקוח <span class="req" aria-hidden="true">*</span></label>
+          <input class="input" id="iEmail" name="CustomerEmail" type="email" dir="ltr" required autocomplete="off"></div>
+        <div class="fld full"><label for="iNotes">הערות</label>
+          <textarea class="textarea" id="iNotes" name="Notes" rows="2"></textarea></div>
+      </div>
+      <div class="vat" aria-live="polite">
+        <div><div class="k">לפני מע״מ</div><div class="v" id="vAmt">—</div></div>
+        <div><div class="k" id="vRateL">מע״מ</div><div class="v" id="vVat">—</div></div>
+        <div><div class="k">סה״כ לתשלום</div><div class="v" id="vTot">—</div></div>
+        <div class="note">תצוגה מקדימה בלבד: 18% מ-1/1/2025, ו-17% לתאריך מוקדם יותר. החישוב הקובע נעשה ב-n8n (WF01), והחשבונית נשמרת בסטטוס ״חדש״.</div>
+      </div>
+    </div>
+    <div class="modal-f"><button class="btn primary" type="submit">יצירת חשבונית</button><button class="btn ghost" type="button" data-close>ביטול</button></div>
+  </form>
+</dialog>
+
+<!-- New lead -->
+<dialog class="modal" id="dlgLead" aria-labelledby="leadT">
+  <form id="leadForm" novalidate>
+    <div class="modal-h"><h2 id="leadT">ליד חדש</h2><button class="btn icon ghost" type="button" data-close aria-label="סגירה"><svg class="i" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+    <div class="modal-b">
+      <p class="formerr" role="alert"></p>
+      <div class="grid2">
+        <div class="fld"><label for="lName">שם מלא <span class="req" aria-hidden="true">*</span></label><input class="input" id="lName" name="Name" required autocomplete="off"></div>
+        <div class="fld"><label for="lEmail">מייל <span class="req" aria-hidden="true">*</span></label><input class="input" id="lEmail" name="Email" type="email" dir="ltr" required autocomplete="off"></div>
+        <div class="fld"><label for="lPhone">טלפון</label><input class="input" id="lPhone" name="Phone" type="tel" dir="ltr" autocomplete="off" placeholder="050-0000000"></div>
+        <div class="fld"><label for="lCompany">חברה</label><input class="input" id="lCompany" name="Company" autocomplete="off"></div>
+        <div class="fld"><label for="lSource">מקור</label>
+          <select class="select" id="lSource" name="Source"><option>אפליקציית ניהול</option><option>אתר</option><option>טלפון</option><option>הפניה</option><option>רשתות חברתיות</option><option>ביקור בחנות</option></select></div>
+        <div class="fld"><label for="lInterest">תחום עניין</label>
+          <select class="select" id="lInterest" name="Interest"><option>שמע</option><option>בית חכם</option><option>אביזרי מחשב</option><option>אביזרי טלפון</option><option>כבלים וטעינה</option><option>גיימינג</option><option>לבישים</option><option>רכש לעסק</option></select></div>
+        <div class="fld full"><label for="lNotes">הערות</label><textarea class="textarea" id="lNotes" name="Notes" rows="2"></textarea></div>
+      </div>
+    </div>
+    <div class="modal-f"><button class="btn primary" type="submit">יצירת ליד</button><button class="btn ghost" type="button" data-close>ביטול</button></div>
+  </form>
+</dialog>
+
+<!-- New task -->
+<dialog class="modal" id="dlgTask" aria-labelledby="taskT">
+  <form id="taskForm" novalidate>
+    <div class="modal-h"><h2 id="taskT">משימה חדשה</h2><button class="btn icon ghost" type="button" data-close aria-label="סגירה"><svg class="i" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+    <div class="modal-b">
+      <p class="formerr" role="alert"></p>
+      <div class="grid2">
+        <div class="fld full"><label for="tTitle">מה צריך לעשות <span class="req" aria-hidden="true">*</span></label><input class="input" id="tTitle" name="Title" required autocomplete="off"></div>
+        <div class="fld"><label for="tPrio">עדיפות</label><select class="select" id="tPrio" name="Priority"><option>נמוכה</option><option selected>רגילה</option><option>גבוהה</option></select></div>
+        <div class="fld"><label for="tDue">תאריך יעד</label><input class="input" id="tDue" name="DueDate" type="date"></div>
+      </div>
+    </div>
+    <div class="modal-f"><button class="btn primary" type="submit">יצירת משימה</button><button class="btn ghost" type="button" data-close>ביטול</button></div>
+  </form>
+</dialog>
+
+<div class="toasts" id="toasts" aria-live="polite"></div>
+
+<script>
+"use strict";
+/* =========================================================================
+   Kilohertz ERP-AI · reference admin client for WF13 (POST /webhook/kilohertz/app)
+   Contract:
+     {action:"list",   table}            -> {ok, table, records:[{id, fields}]}
+     {action:"create", table, payload}   -> {ok, id}
+     {action:"chat",   message, sessionId} -> {ok, reply}
+     error                               -> {ok:false, error} (HTTP 400)
+   ========================================================================= */
+
+/* ---------- small helpers ---------- */
+const $ = (s, el = document) => el.querySelector(s);
+const $$ = (s, el = document) => [...el.querySelectorAll(s)];
+const esc = v => String(v ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const round2 = n => Math.round((Number(n) + Number.EPSILON) * 100) / 100;
+const ILS2 = new Intl.NumberFormat("he-IL", {style:"currency", currency:"ILS", minimumFractionDigits:2, maximumFractionDigits:2});
+const ILS0 = new Intl.NumberFormat("he-IL", {style:"currency", currency:"ILS", maximumFractionDigits:0});
+const INT = new Intl.NumberFormat("he-IL");
+const money = (n, whole) => (n == null || n === "" || isNaN(n)) ? "—" : (whole ? ILS0 : ILS2).format(Number(n));
+const pad2 = n => String(n).padStart(2, "0");
+const isoDay = d => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+const todayISO = () => isoDay(new Date());
+function fmtDate(v){
+  if (!v) return "—";
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(v));
+  if (m) return `${m[3]}/${m[2]}/${m[1]}`;
+  const d = new Date(v);
+  if (isNaN(d)) return esc(v);
+  return `${pad2(d.getDate())}/${pad2(d.getMonth() + 1)}/${d.getFullYear()}`;
+}
+const dayPart = v => v ? (/^\d{4}-\d{2}-\d{2}/.test(v) ? String(v).slice(0, 10) : isoDay(new Date(v))) : "";
+const vatRateFor = iso => (iso && iso < "2025-01-01") ? 0.17 : 0.18;
+const pct = r => r == null || r === "" ? "—" : `${round2(Number(r) <= 1 ? Number(r) * 100 : Number(r))}%`;
+function invTotal(f){
+  if (f.Total != null && f.Total !== "") return Number(f.Total);
+  const a = Number(f.Amount) || 0;
+  return round2(a * (1 + vatRateFor(dayPart(f.IssueDate))));
+}
+const safeUrl = u => /^https?:\/\//i.test(String(u || "")) ? String(u) : "";
+const ICON = {
+  dashboard:'<rect x="4" y="4" width="6" height="9" rx="1"/><rect x="14" y="4" width="6" height="5" rx="1"/><rect x="14" y="13" width="6" height="7" rx="1"/><rect x="4" y="17" width="6" height="3" rx="1"/>',
+  invoices:'<path d="M7 3h8l4 4v14H7zM15 3v4h4M10 12h6M10 16h6"/>',
+  leads:'<path d="M15 19c0-2.8-2.7-5-6-5s-6 2.2-6 5M9 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7M19 8v6M16 11h6"/>',
+  products:'<path d="M3 7.5 12 3l9 4.5v9L12 21l-9-4.5zM3 7.5 12 12l9-4.5M12 12v9"/>',
+  tasks:'<path d="M10 6h10M10 12h10M10 18h10M4 6l1.2 1.2L7.5 5M4 12l1.2 1.2L7.5 11M4 18l1.2 1.2L7.5 17"/>',
+  search:'<path d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-4-4"/>',
+  plus:'<path d="M12 5v14M5 12h14"/>',
+  refresh:'<path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7"/>',
+  ext:'<path d="M14 4h6v6M20 4l-9 9M18 14v6H4V6h6"/>',
+  arrow:'<path d="M12 4v15M7 14l5 5 5-5"/>'
+};
+const icon = (n, cls = "i") => `<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true">${ICON[n]}</svg>`;
+
+/* ---------- storage (sessionStorage only, never localStorage) ---------- */
+const mem = {};
+const store = {
+  get(k){ try { return sessionStorage.getItem(k) ?? mem[k] ?? ""; } catch { return mem[k] ?? ""; } },
+  set(k, v){ mem[k] = v; try { v ? sessionStorage.setItem(k, v) : sessionStorage.removeItem(k); } catch {} }
+};
+const cfg = () => ({ url: store.get("khz.webhookUrl").trim(), key: store.get("khz.apiKey") });
+const isDemo = () => !cfg().url;
+let sessionId = store.get("khz.sessionId");
+if (!sessionId){
+  const rnd = (crypto.getRandomValues ? [...crypto.getRandomValues(new Uint8Array(4))].map(b => b.toString(16).padStart(2, "0")).join("") : Math.random().toString(16).slice(2, 10));
+  sessionId = "app-" + rnd; store.set("khz.sessionId", sessionId);
+}
+
+/* ---------- the one network entry point ---------- */
+class ApiError extends Error {}
+const LIST_TABLES = ["Invoices", "Leads", "Products", "Tasks"];
+const CREATE_TABLES = ["Invoices", "Leads", "Tasks"];
+
+async function api(action, body = {}){
+  const { url, key } = cfg();
+  if (!url) return demoApi(action, body);
+
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), action === "chat" ? 90000 : 25000);
+  let res, text;
+  try {
+    res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...(key ? { "x-api-key": key } : {}) },
+      body: JSON.stringify({ action, ...body }),
+      signal: ctrl.signal
+    });
+    text = await res.text();
+  } catch (e) {
+    if (e.name === "AbortError") throw new ApiError(action === "chat" ? "הסוכן לא ענה בזמן. נסו שוב בעוד רגע, או בדקו ב-n8n שהריצה של WF13 לא נתקעה." : "השרת לא ענה בזמן. בדקו שה-Workflow של WF13 פעיל ב-n8n.");
+    throw new ApiError("אין תשובה מהשרת. בדקו את כתובת ה-Webhook ואת החיבור לאינטרנט. אם הכתובת נכונה — ייתכן שחסרה הרשאת CORS ב-Webhook (Allowed Origins).");
+  } finally { clearTimeout(timer); }
+
+  let data = null;
+  try { data = text ? JSON.parse(text) : null; } catch { data = null; }
+
+  if (!res.ok || !data || data.ok === false){
+    const fromServer = data && typeof data.error === "string" ? data.error : "";
+    if (res.status === 401 || res.status === 403) throw new ApiError("המפתח נדחה. ודאו שהערך בשדה מפתח ה-API זהה ל-Header Auth שהוגדר ב-n8n.");
+    if (res.status === 404) throw new ApiError("הכתובת לא נמצאה (404). ודאו שה-Workflow של WF13 במצב Active ושמשתמשים בכתובת Production (‎/webhook/‎) ולא בכתובת הבדיקה.");
+    if (res.status >= 500) throw new ApiError(`שגיאה בצד n8n (${res.status}). פתחו את רשימת ההרצות (Executions) של WF13 כדי לראות איזה צומת נכשל.`);
+    if (fromServer) throw new ApiError("הבקשה נדחתה: " + fromServer);
+    if (res.ok && !data) throw new ApiError("התשובה מהשרת אינה JSON תקין. בדקו את צומת Respond to Webhook ב-WF13.");
+    throw new ApiError(`הבקשה נדחתה (${res.status}).`);
+  }
+  return data;
+}
+
+/* ---------- demo backend: same contract, in memory ---------- */
+const demoDB = buildDemoData();
+let demoSeq = 900;
+function demoApi(action, body){
+  return new Promise((resolve, reject) => {
+    setTimeout(() => {
+      const fail = msg => reject(new ApiError("הבקשה נדחתה: " + msg));
+      if (action === "list"){
+        if (!LIST_TABLES.includes(body.table)) return fail(`הטבלה ${body.table || "(ריקה)"} אינה ברשימה המותרת`);
+        return resolve({ ok:true, table:body.table, records: JSON.parse(JSON.stringify(demoDB[body.table].slice(0, 100))) });
+      }
+      if (action === "create"){
+        if (!CREATE_TABLES.includes(body.table)) return fail(`אי אפשר ליצור רשומות בטבלה ${body.table || "(ריקה)"}`);
+        if (!body.payload || typeof body.payload !== "object") return fail("חסר payload");
+        const id = "recDEMO" + (++demoSeq) + Math.random().toString(36).slice(2, 7).toUpperCase();
+        demoDB[body.table].unshift({ id, fields: { ...body.payload, Created: new Date().toISOString() } });
+        if (body.table === "Invoices") simulateValidation(id);
+        return resolve({ ok:true, id });
+      }
+      if (action === "chat"){
+        if (!String(body.message || "").trim()) return fail("ההודעה ריקה");
+        return resolve({ ok:true, reply: demoReply() });
+      }
+      fail(`פעולה לא נתמכת: ${action}`);
+    }, action === "chat" ? 900 : 260 + Math.random() * 240);
+  });
+}
+function simulateValidation(id){
+  // Mimics WF01 in demo mode: New -> Pending with VAT computed
+  setTimeout(() => {
+    const r = demoDB.Invoices.find(x => x.id === id); if (!r) return;
+    const f = r.fields, rate = vatRateFor(f.IssueDate), amt = Number(f.Amount) || 0;
+    const valid = amt > 0 && /\S+@\S+\.\S+/.test(f.CustomerEmail || "") && /^CUST-\d{4}$/.test(f.CustomerId || "");
+    Object.assign(f, valid ? { Status:"Pending", VatRate:rate, VatAmount:round2(amt * rate), Total:round2(amt * (1 + rate)) }
+                           : { Status:"Invalid", Notes:"האימות נכשל: נתוני לקוח או סכום חסרים" });
+    if (isDemo()){ loadTable("Invoices", true); toast(valid ? "הדמיית WF01: החשבונית אומתה ועברה ל״ממתין להפקה״" : "הדמיית WF01: החשבונית סומנה כ״לא תקין״"); }
+  }, 2600);
+}
+function demoReply(){
+  const inv = demoDB.Invoices.map(r => r.fields);
+  const open = inv.filter(f => f.Status !== "Done");
+  const hi = demoDB.Tasks.filter(r => r.fields.Status === "Open" && r.fields.Priority === "גבוהה").length;
+  return "אני רץ כרגע במצב הדגמה, בלי חיבור לסוכן האמיתי ב-n8n.\n\n" +
+    `בנתוני ההדגמה יש ${open.length} חשבוניות פתוחות בסך ${money(open.reduce((s, f) => s + invTotal(f), 0), true)}, ` +
+    `ו-${hi} משימות פתוחות בעדיפות גבוהה.\n\n` +
+    "כדי לקבל תשובות אמיתיות: פתחו את ההגדרות, הזינו את כתובת ה-Webhook של WF13 ואת מפתח ה-API, והשיחה תעבור לסוכן.";
+}
+
+function buildDemoData(){
+  const now = new Date();
+  const y = now.getFullYear(), m = now.getMonth(), td = now.getDate();
+  const inMonth = day => isoDay(new Date(y, m, Math.min(day, td)));
+  const ago = days => isoDay(new Date(y, m, td - days));
+  const ts = (iso, h = 10) => new Date(iso + `T${pad2(h)}:15:00`).toISOString();
+  const pdf = n => `https://docs.kilohertz.example/invoices/${n}.html`;
+  let rid = 0; const rec = fields => ({ id: "recDemo" + String(++rid).padStart(10, "0"), fields });
+
+  const inv = (num, type, cid, name, email, date, amount, status, notes) => {
+    const f = { DocType:type, CustomerId:cid, CustomerName:name, CustomerEmail:email, IssueDate:date, Amount:amount, Status:status, Created:ts(date, 9) };
+    if (status !== "New" && status !== "Invalid"){
+      const r = vatRateFor(date);
+      Object.assign(f, { VatRate:r, VatAmount:round2(amount * r), Total:round2(amount * (1 + r)) });
+    }
+    if (status === "Done"){ f.InvoiceNumber = num; f.PdfUrl = pdf(num); }
+    if (notes) f.Notes = notes;
+    return rec(f);
+  };
+  const Invoices = [
+    inv(null, "חשבונית מס", "CUST-0019", "קפה אורנים בע״מ", "office@oranim-cafe.example", ago(0), 3480, "New"),
+    inv(null, "קבלה", "CUST-0008", "יעל ברגר", "yael.berger@mail.example", ago(1), 560, "New"),
+    inv(null, "חשבונית מס", "CUST-0014", "מאיר טל הפקות", "meir@tal-prod.example", ago(2), 9200, "Pending"),
+    inv(null, "חשבונית", "CUST-0021", "תומר אלון", "tomer.alon@mail.example", ago(3), 1270, "Pending"),
+    inv(null, "חשבונית מס", "CUST-0005", "עמותת צעד קדימה", "", ago(4), 6150, "Invalid", "חסרה כתובת מייל של הלקוח"),
+    inv(1058, "חשבונית מס", "CUST-0011", "מרכז הלמידה רעות", "info@reut-learning.example", inMonth(8), 18300, "Done"),
+    inv(5021, "קבלה", "CUST-0008", "יעל ברגר", "yael.berger@mail.example", inMonth(6), 1150, "Done"),
+    inv(1057, "חשבונית מס", "CUST-0003", "סטודיו גל ים", "hello@galyam-studio.example", inMonth(3), 7640, "Done"),
+    inv(3012, "חשבונית", "CUST-0017", "דנה פרץ", "dana.peretz@mail.example", inMonth(1), 2890, "Done"),
+    inv(1049, "חשבונית מס", "CUST-0011", "מרכז הלמידה רעות", "info@reut-learning.example", ago(34), 12400, "Done"),
+    inv(3009, "חשבונית", "CUST-0002", "רון כהן", "ron.cohen@mail.example", ago(52), 940, "Done"),
+    inv(1001, "חשבונית מס", "CUST-0003", "סטודיו גל ים", "hello@galyam-studio.example", "2024-11-18", 4250, "Done", "מסמך משנת 2024 — מע״מ 17%")
+  ];
+
+  const lead = (name, email, phone, company, source, interest, status, created, last, notes) =>
+    rec({ Name:name, Email:email, Phone:phone, Company:company, Source:source, Interest:interest, Status:status, LastContacted:last || "", Notes:notes || "", Created:ts(created, 11) });
+  const Leads = [
+    lead("אביגיל שושן", "avigail.s@mail.example", "050-5550142", "", "אתר", "שמע", "New", ago(0)),
+    lead("נדב קורן", "nadav@koren-arch.example", "052-5550177", "קורן אדריכלים", "הפניה", "בית חכם", "New", ago(1), "", "מעוניין בהצעה ל-12 שקעים חכמים למשרד"),
+    lead("שירה מזרחי", "shira.m@mail.example", "054-5550120", "", "רשתות חברתיות", "לבישים", "New", ago(1)),
+    lead("איתי רבינוביץ", "itay@pixelhouse.example", "053-5550193", "פיקסל האוס", "אתר", "רכש לעסק", "New", ago(2)),
+    lead("מיכל אדלר", "michal.adler@mail.example", "050-5550111", "", "טלפון", "אביזרי מחשב", "Contacted", ago(5), ago(3)),
+    lead("עומר ג׳אבר", "omer.j@mail.example", "058-5550164", "", "אתר", "גיימינג", "Contacted", ago(6), ago(4)),
+    lead("ליאת פרידמן", "liat@fridman-law.example", "052-5550135", "פרידמן ושות׳", "הפניה", "כבלים וטעינה", "Contacted", ago(9), ago(6)),
+    lead("גיא נחמיאס", "guy.n@mail.example", "054-5550188", "", "ביקור בחנות", "שמע", "Replied", ago(12), ago(10), "ביקש לתאם הדגמה של רמקולים בחנות"),
+    lead("רותם בן דוד", "rotem@greenbyte.example", "050-5550159", "גרין בייט", "רשתות חברתיות", "בית חכם", "Replied", ago(15), ago(13)),
+    lead("אביגיל שושן", "avigail.s@mail.example", "050-5550142", "", "טלגרם", "שמע", "Duplicate", ago(0), "", "פנייה חוזרת מאותו מייל")
+  ];
+
+  const prod = (sku, name, cat, price, desc, inStock) => rec({ Sku:sku, Name:name, Category:cat, Price:price, Description:desc, InStock:inStock });
+  const Products = [
+    prod("KHZ-AUD-101", "אוזניות קשת אלחוטיות עם סינון רעשים", "שמע", 649, "סינון רעשים אקטיבי, עד 30 שעות האזנה, טעינה ב-USB-C.", true),
+    prod("KHZ-AUD-114", "רמקול בלוטות׳ נייד עמיד במים", "שמע", 289, "עמידות IPX7, 12 שעות סוללה, אפשרות לחיבור שני רמקולים.", true),
+    prod("KHZ-HOM-203", "שקע חכם Wi-Fi עם מדידת צריכה", "בית חכם", 79, "שליטה מהטלפון, תזמונים ומעקב צריכת חשמל.", true),
+    prod("KHZ-HOM-210", "נורת LED חכמה E27 צבעונית", "בית חכם", 59, "16 מיליון גוונים, עמעום ושליטה קולית.", false),
+    prod("KHZ-PCA-305", "מקלדת מכנית אלחוטית בעברית", "אביזרי מחשב", 429, "מתגים שקטים, תאורה לבנה, חיבור לשלושה מכשירים.", true),
+    prod("KHZ-PCA-318", "עכבר ארגונומי אנכי", "אביזרי מחשב", 189, "מפחית עומס על פרק כף היד, 6 כפתורים.", true),
+    prod("KHZ-PHN-402", "מגן מסך זכוכית מחוסמת", "אביזרי טלפון", 49, "קשיחות 9H, ערכת התקנה מצורפת.", true),
+    prod("KHZ-CHG-507", "מטען GaN שלוש יציאות 65W", "כבלים וטעינה", 199, "שתי יציאות USB-C ויציאת USB-A, טעינה מהירה למחשב נייד.", true),
+    prod("KHZ-CHG-512", "כבל USB-C קלוע 2 מטר", "כבלים וטעינה", 45, "עד 100W, מעטפת קלועה עמידה.", true),
+    prod("KHZ-GMG-604", "שלט משחק אלחוטי למחשב ולטלפון", "גיימינג", 249, "חיבור בלוטות׳ או חוטי, רטט כפול.", false),
+    prod("KHZ-WRB-701", "שעון ספורט חכם עם GPS", "לבישים", 899, "מדידת דופק ושינה, עמיד במים עד 50 מטר.", true)
+  ];
+
+  const task = (title, status, prio, due, source, created) => rec({ Title:title, Status:status, Priority:prio, DueDate:due, Source:source, Created:ts(created, 8) });
+  const ahead = days => isoDay(new Date(y, m, td + days));
+  const Tasks = [
+    task("לחזור לגיא נחמיאס ולתאם הדגמת רמקולים", "Open", "גבוהה", ahead(1), "Sales Reply", ago(10)),
+    task("להשלים מייל לקוח בחשבונית של עמותת צעד קדימה", "Open", "גבוהה", ago(1), "Manager Agent", ago(4)),
+    task("להזמין מלאי נורות LED חכמות", "Open", "רגילה", ahead(3), "Manager Agent", ago(2)),
+    task("לשלוח הצעת מחיר לרותם בן דוד (גרין בייט)", "Open", "רגילה", ahead(5), "Sales Reply", ago(13)),
+    task("לעדכן תמונות מוצר באתר לקטגוריית גיימינג", "Done", "נמוכה", ago(3), "App", ago(9)),
+    task("לבדוק החזרה של שלט משחק פגום", "Done", "רגילה", ago(6), "Manager Agent", ago(11))
+  ];
+  return { Invoices, Leads, Products, Tasks };
+}
+
+/* ---------- status vocabularies ---------- */
+const ST = {
+  Invoices: { New:["חדש","c-blue"], Pending:["ממתין להפקה","c-amber"], Invalid:["לא תקין","c-red"], Done:["הופק","c-green"] },
+  Leads:    { New:["חדש","c-blue"], Contacted:["נשלח מייל","c-amber"], Replied:["השיב","c-green"], Duplicate:["כפול","c-grey"] },
+  Tasks:    { Open:["פתוחה","c-blue"], Done:["בוצעה","c-green"] }
+};
+const chip = (table, v) => {
+  const s = ST[table][v] || [v || "ללא סטטוס", "c-grey"];
+  return `<span class="chip ${s[1]}" title="${esc(v)}"><span class="led"></span>${esc(s[0])}</span>`;
+};
+const PRIO = { "גבוהה":"p-high", "רגילה":"p-norm", "נמוכה":"p-low" };
+const ptag = p => p ? `<span class="ptag ${PRIO[p] || "p-low"}">${esc(p)}</span>` : "—";
+
+/* ---------- table view definitions ---------- */
+const VIEWS = {
+  dashboard: { title:"דשבורד", icon:"dashboard" },
+  invoices: {
+    title:"חשבוניות", icon:"invoices", table:"Invoices", noun:"חשבוניות", create:"dlgInvoice", createLabel:"חשבונית חדשה",
+    filterLabel:"סינון לפי סטטוס", filter:[["","כל הסטטוסים"], ...Object.entries(ST.Invoices).map(([k, v]) => [k, v[0]])],
+    match:(f, v) => f.Status === v,
+    sort:(a, b) => String(b.fields.IssueDate || "").localeCompare(String(a.fields.IssueDate || "")),
+    cols:[
+      ["מס׳ מסמך", f => f.InvoiceNumber ? `<span class="strong num">${esc(f.InvoiceNumber)}</span>` : `<span class="dim">טרם הוקצה</span>`, "lead-cell"],
+      ["סוג", f => esc(f.DocType || "—")],
+      ["לקוח", f => `<span><span class="strong">${esc(f.CustomerName || "—")}</span><span class="sub mono">${esc(f.CustomerId || "")}</span></span>`],
+      ["תאריך", f => `<span class="num">${fmtDate(f.IssueDate)}</span>`],
+      ["לפני מע״מ", f => money(f.Amount), "n"],
+      ["מע״מ", f => f.VatAmount != null ? `<span>${money(f.VatAmount)}<span class="sub">${pct(f.VatRate)}</span></span>` : `<span class="dim">${f.Status === "New" ? "ממתין לאימות" : "—"}</span>`, "n"],
+      ["סה״כ", f => f.Total != null ? `<span class="strong">${money(f.Total)}</span>` : "—", "n"],
+      ["סטטוס", f => chip("Invoices", f.Status)],
+      ["מסמך", f => safeUrl(f.PdfUrl) ? `<a class="doclink" href="${esc(safeUrl(f.PdfUrl))}" target="_blank" rel="noopener noreferrer">פתיחת מסמך ${icon("ext")}<span class="sr-only"> (נפתח בלשונית חדשה)</span></a>` : `<span class="dim">—</span>`]
+    ]
+  },
+  leads: {
+    title:"לידים", icon:"leads", table:"Leads", noun:"לידים", create:"dlgLead", createLabel:"ליד חדש",
+    filterLabel:"סינון לפי סטטוס", filter:[["","כל הסטטוסים"], ...Object.entries(ST.Leads).map(([k, v]) => [k, v[0]])],
+    match:(f, v) => f.Status === v,
+    sort:(a, b) => String(b.fields.Created || "").localeCompare(String(a.fields.Created || "")),
+    cols:[
+      ["שם", f => `<span><span class="strong">${esc(f.Name || "—")}</span>${f.Company ? `<span class="sub">${esc(f.Company)}</span>` : ""}</span>`, "lead-cell"],
+      ["פרטי קשר", f => `<span dir="ltr" style="text-align:left"><span class="mono">${esc(f.Email || "—")}</span>${f.Phone ? `<span class="sub mono">${esc(f.Phone)}</span>` : ""}</span>`],
+      ["מקור", f => esc(f.Source || "—")],
+      ["תחום עניין", f => esc(f.Interest || "—")],
+      ["סטטוס", f => chip("Leads", f.Status)],
+      ["קשר אחרון", f => `<span class="num">${fmtDate(f.LastContacted)}</span>`],
+      ["נכנס", f => `<span class="num">${fmtDate(f.Created)}</span>`]
+    ]
+  },
+  products: {
+    title:"מוצרים", icon:"products", table:"Products", noun:"מוצרים",
+    filterLabel:"סינון לפי מלאי", filter:[["","כל המוצרים"], ["in","במלאי"], ["out","אזל מהמלאי"]],
+    match:(f, v) => v === "in" ? !!f.InStock : !f.InStock,
+    sort:(a, b) => String(a.fields.Sku || "").localeCompare(String(b.fields.Sku || "")),
+    cols:[
+      ["מוצר", f => `<span><span class="strong">${esc(f.Name || "—")}</span><span class="sub mono" dir="ltr" style="text-align:right">${esc(f.Sku || "")}</span></span>`, "lead-cell"],
+      ["קטגוריה", f => esc(f.Category || "—")],
+      ["תיאור", f => `<span class="dim">${esc(f.Description || "")}</span>`],
+      ["מחיר", f => `<span class="strong">${money(f.Price)}</span>`, "n"],
+      ["מלאי", f => f.InStock ? `<span class="stock in"><span class="led"></span>במלאי</span>` : `<span class="stock out"><span class="led"></span>אזל</span>`]
+    ]
+  },
+  tasks: {
+    title:"משימות", icon:"tasks", table:"Tasks", noun:"משימות", create:"dlgTask", createLabel:"משימה חדשה",
+    filterLabel:"סינון לפי סטטוס", filter:[["","כל הסטטוסים"], ...Object.entries(ST.Tasks).map(([k, v]) => [k, v[0]])],
+    match:(f, v) => f.Status === v,
+    sort:(a, b) => (a.fields.Status === "Done") - (b.fields.Status === "Done") || String(a.fields.DueDate || "9999").localeCompare(String(b.fields.DueDate || "9999")),
+    cols:[
+      ["משימה", f => `<span class="strong">${esc(f.Title || "—")}</span>`, "lead-cell"],
+      ["עדיפות", f => ptag(f.Priority)],
+      ["תאריך יעד", f => { const late = f.Status !== "Done" && f.DueDate && dayPart(f.DueDate) < todayISO(); return `<span class="num" ${late ? 'style="color:var(--red);font-weight:700"' : ""}>${fmtDate(f.DueDate)}${late ? " · באיחור" : ""}</span>`; }],
+      ["מקור", f => `<span class="mono">${esc(f.Source || "—")}</span>`],
+      ["סטטוס", f => chip("Tasks", f.Status)],
+      ["נוצרה", f => `<span class="num">${fmtDate(f.Created)}</span>`]
+    ]
+  }
+};
+
+/* ---------- state ---------- */
+const state = {
+  view: "dashboard",
+  data: { Invoices:null, Leads:null, Products:null, Tasks:null },
+  err: {}, loading: {},
+  q: {}, f: {}
+};
+
+/* ---------- build nav + table views ---------- */
+function buildShell(){
+  $("#nav").innerHTML = Object.entries(VIEWS).map(([k, v]) =>
+    `<button type="button" data-view-btn="${k}">${icon(v.icon)}<span>${v.title}</span>${v.table ? `<span class="count" id="cnt-${v.table}"></span>` : ""}</button>`).join("");
+  $("#tableViews").innerHTML = Object.entries(VIEWS).filter(([, v]) => v.table).map(([k, v]) => `
+    <section id="view-${k}" data-view hidden aria-labelledby="pageTitle">
+      <div class="card">
+        <div class="toolbar">
+          <div class="field-search">
+            <label class="sr-only" for="q-${k}">חיפוש ב${v.title}</label>
+            ${icon("search")}
+            <input class="input" type="search" id="q-${k}" data-q="${k}" placeholder="חיפוש ב${v.title}…" autocomplete="off">
+          </div>
+          <label class="sr-only" for="f-${k}">${v.filterLabel}</label>
+          <select class="select" id="f-${k}" data-f="${k}">${v.filter.map(([val, lab]) => `<option value="${val}">${lab}</option>`).join("")}</select>
+          <span class="count" id="count-${k}" aria-live="polite"></span>
+          <button class="btn icon ghost" type="button" data-reload="${v.table}" aria-label="רענון ${v.title}" title="רענון">${icon("refresh")}</button>
+          ${v.create ? `<button class="btn primary" type="button" data-open="${v.create}">${icon("plus")}<span>${v.createLabel}</span></button>` : ""}
+        </div>
+        <div class="tablewrap" id="body-${k}"></div>
+      </div>
+    </section>`).join("");
+}
+
+function show(view){
+  if (!VIEWS[view]) view = "dashboard";
+  state.view = view;
+  $$("[data-view]").forEach(s => s.hidden = s.id !== "view-" + view);
+  $$("[data-view-btn]").forEach(b => b.dataset.viewBtn === view ? b.setAttribute("aria-current", "page") : b.removeAttribute("aria-current"));
+  $("#pageTitle").textContent = VIEWS[view].title;
+  document.title = `קילוהרץ · ${VIEWS[view].title}`;
+  if (location.hash !== "#" + view) history.replaceState(null, "", "#" + view);
+  render();
+}
+
+/* ---------- loading ---------- */
+async function loadTable(table, quiet){
+  state.loading[table] = true; state.err[table] = null;
+  if (!quiet) render();
+  try {
+    const res = await api("list", { table });
+    state.data[table] = Array.isArray(res.records) ? res.records : [];
+  } catch (e) {
+    state.err[table] = e.message || "שגיאה לא צפויה";
+    if (!quiet) toast(`טעינת ${tableHeb(table)} נכשלה`, true);
+  } finally {
+    state.loading[table] = false; render();
+  }
+}
+const tableHeb = t => ({ Invoices:"החשבוניות", Leads:"הלידים", Products:"המוצרים", Tasks:"המשימות" }[t]);
+function loadAll(){ return Promise.allSettled(LIST_TABLES.map(t => loadTable(t))); }
+
+/* ---------- rendering ---------- */
+function render(){
+  for (const t of LIST_TABLES){ const c = $("#cnt-" + t); if (c) c.textContent = state.data[t] ? state.data[t].length : ""; }
+  if (state.view === "dashboard") renderDashboard();
+  else renderTable(state.view);
+}
+
+function renderTable(k){
+  const v = VIEWS[k], t = v.table, host = $("#body-" + k);
+  const recs = state.data[t];
+  if (state.err[t] && !recs){
+    host.innerHTML = `<div class="state err"><strong>לא הצלחנו לטעון את ${tableHeb(t)}</strong>${esc(state.err[t])}<br><button class="btn" type="button" data-reload="${t}">${icon("refresh")}ניסיון חוזר</button></div>`;
+    $("#count-" + k).textContent = ""; return;
+  }
+  if (!recs){
+    host.innerHTML = `<table><tbody>${Array.from({length:6}, () => `<tr>${v.cols.map(() => `<td><div class="skel"></div></td>`).join("")}</tr>`).join("")}</tbody></table>`;
+    $("#count-" + k).textContent = "טוען…"; return;
+  }
+  const q = (state.q[k] || "").trim().toLowerCase(), fv = state.f[k] || "";
+  const rows = recs.filter(r => (!fv || v.match(r.fields || {}, fv)) &&
+    (!q || Object.values(r.fields || {}).some(x => String(x ?? "").toLowerCase().includes(q)))).sort(v.sort);
+  $("#count-" + k).textContent = rows.length === recs.length ? `${INT.format(recs.length)} ${v.noun}` : `מציג ${INT.format(rows.length)} מתוך ${INT.format(recs.length)}`;
+  if (!recs.length){
+    host.innerHTML = `<div class="state"><strong>אין עדיין ${v.noun}</strong>${v.create ? `הרשומה הראשונה תופיע כאן ברגע שתיצרו אותה.<br><button class="btn primary" type="button" data-open="${v.create}">${icon("plus")}${v.createLabel}</button>` : "הנתונים יופיעו כאן אחרי שיוזנו לטבלה ב-Airtable."}</div>`;
+    return;
+  }
+  if (!rows.length){
+    host.innerHTML = `<div class="state"><strong>לא נמצאו ${v.noun} שמתאימים לחיפוש</strong>נסו מילה אחרת או בחרו ״${esc(v.filter[0][1])}״ בסינון.</div>`;
+    return;
+  }
+  host.innerHTML = `<table class="cards"><caption class="sr-only">${v.title}</caption><thead><tr>${v.cols.map(c => `<th scope="col" class="${c[2] === "n" ? "n" : ""}">${c[0]}</th>`).join("")}</tr></thead><tbody>${
+    rows.map(r => `<tr>${v.cols.map(c => `<td data-label="${esc(c[0])}" class="${c[2] || ""}">${c[1](r.fields || {}, r)}</td>`).join("")}</tr>`).join("")
+  }</tbody></table>`;
+}
+
+function renderDashboard(){
+  const inv = state.data.Invoices, leads = state.data.Leads, tasks = state.data.Tasks;
+  const today = todayISO(), monthKey = today.slice(0, 7);
+  const now = new Date();
+  const monthName = now.toLocaleDateString("he-IL", { month:"long", year:"numeric" });
+
+  // Revenue scope
+  if (inv){
+    const done = inv.map(r => r.fields || {}).filter(f => f.Status === "Done" && dayPart(f.IssueDate).slice(0, 7) === monthKey);
+    const rev = done.reduce((s, f) => s + invTotal(f), 0);
+    $("#kpiRevenue").textContent = money(rev, true);
+    $("#scopeLegend").innerHTML = `${INT.format(done.length)} מסמכים · ${esc(monthName)}<br><span class="dim">סכום כולל מע״מ</span>`;
+    drawScope(done);
+    const open = inv.map(r => r.fields || {}).filter(f => f.Status !== "Done");
+    $("#kpiOpen").innerHTML = `${INT.format(open.length)}<small>מסמכים</small>`;
+    $("#kpiOpenSub").textContent = `${money(open.reduce((s, f) => s + invTotal(f), 0), true)} ממתינים לגבייה או להפקה`;
+    const c = s => open.filter(f => f.Status === s).length;
+    const node = (s, n) => `<div class="pipe-node">${chip("Invoices", s)}<span class="k">${INT.format(n)}</span></div>`;
+    const arrow = `<span class="pipe-arrow" aria-hidden="true">${icon("arrow")}</span>`;
+    $("#pipe").innerHTML = node("New", c("New")) + arrow +
+      `<div class="pipe-split">${node("Pending", c("Pending"))}${node("Invalid", c("Invalid"))}</div>` + arrow +
+      node("Done", inv.filter(r => (r.fields || {}).Status === "Done").length);
+    $("#pipe").setAttribute("aria-label", "מספר חשבוניות בכל שלב");
+  } else {
+    $("#kpiRevenue").textContent = state.err.Invoices ? "—" : "טוען…";
+    $("#kpiOpen").textContent = "—"; $("#kpiOpenSub").textContent = state.err.Invoices ? "הטעינה נכשלה" : " ";
+    $("#pipe").innerHTML = state.err.Invoices ? `<p class="dim">${esc(state.err.Invoices)}</p>` : `<div class="skel" style="grid-column:1/-1"></div>`;
+    drawScope(null);
+  }
+
+  // Leads
+  if (leads){
+    const order = ["New", "Contacted", "Replied", "Duplicate"];
+    const counts = order.map(s => leads.filter(r => (r.fields || {}).Status === s).length);
+    const other = leads.length - counts.reduce((a, b) => a + b, 0);
+    const max = Math.max(1, ...counts, other);
+    $("#leadsTotal").textContent = `${INT.format(leads.length)} סה״כ`;
+    $("#leadBars").innerHTML = order.map((s, i) =>
+      `<li title="${esc(ST.Leads[s][0])}: ${counts[i]}"><span>${esc(ST.Leads[s][0])}</span><span class="track" role="presentation"><span class="fill${s === "Duplicate" ? " mutedfill" : ""}" style="width:${counts[i] / max * 100}%"></span></span><span class="n">${counts[i]}</span></li>`).join("") +
+      (other ? `<li><span>אחר</span><span class="track"><span class="fill mutedfill" style="width:${other / max * 100}%"></span></span><span class="n">${other}</span></li>` : "");
+    $("#kpiLeads").innerHTML = `${INT.format(counts[0])}<small>ממתינים</small>`;
+    const wk = leads.filter(r => dayPart((r.fields || {}).Created) >= isoDay(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7))).length;
+    $("#kpiLeadsSub").textContent = `עוד לא נשלח אליהם מייל · ${INT.format(wk)} נכנסו השבוע`;
+  } else {
+    $("#leadBars").innerHTML = state.err.Leads ? `<li class="dim" style="display:block">${esc(state.err.Leads)}</li>` : [1,2,3,4].map(() => `<li><div class="skel"></div><div class="skel"></div><div class="skel"></div></li>`).join("");
+    $("#kpiLeads").textContent = "—"; $("#kpiLeadsSub").textContent = " "; $("#leadsTotal").textContent = "";
+  }
+
+  // Tasks
+  if (tasks){
+    const open = tasks.map(r => r.fields || {}).filter(f => f.Status !== "Done")
+      .sort((a, b) => String(a.DueDate || "9999").localeCompare(String(b.DueDate || "9999")));
+    const late = open.filter(f => f.DueDate && dayPart(f.DueDate) < today).length;
+    $("#kpiTasks").innerHTML = `${INT.format(open.length)}<small>לטיפול</small>`;
+    $("#kpiTasksSub").textContent = late ? `${INT.format(late)} באיחור` : "אין משימות באיחור";
+    $("#kpiTasksSub").style.color = late ? "var(--red)" : "";
+    $("#openTasks").innerHTML = open.length ? open.slice(0, 5).map(f => {
+      const isLate = f.DueDate && dayPart(f.DueDate) < today;
+      return `<li><span class="prio ${PRIO[f.Priority] || ""}" aria-hidden="true"></span>
+        <div><div class="t">${esc(f.Title || "—")}</div><div class="s">עדיפות ${esc(f.Priority || "לא צוינה")} · <span class="mono">${esc(f.Source || "")}</span></div></div>
+        <div class="due${isLate ? " late" : ""}">${f.DueDate ? fmtDate(f.DueDate) : "ללא תאריך"}${isLate ? "<br>באיחור" : ""}</div></li>`;
+    }).join("") : `<li style="display:block" class="dim">אין משימות פתוחות. משימה חדשה תופיע כאן.</li>`;
+  } else {
+    $("#openTasks").innerHTML = state.err.Tasks ? `<li style="display:block" class="dim">${esc(state.err.Tasks)}</li>` : [1,2,3].map(() => `<li style="display:block"><div class="skel"></div></li>`).join("");
+    $("#kpiTasks").textContent = "—"; $("#kpiTasksSub").textContent = " ";
+  }
+}
+
+/* ---------- signature: month-to-date revenue on a scope graticule ---------- */
+let scopeData = null;
+function niceStep(v){
+  const p = Math.pow(10, Math.floor(Math.log10(v))), n = v / p;
+  return (n <= 1 ? 1 : n <= 2 ? 2 : n <= 2.5 ? 2.5 : n <= 5 ? 5 : 10) * p;
+}
+function drawScope(done){
+  const el = $("#scope"), axis = $("#scopeAxis");
+  const W = el.clientWidth, H = el.clientHeight;
+  if (!W) return;
+  const now = new Date(), y = now.getFullYear(), m = now.getMonth(), td = now.getDate();
+  const dim = new Date(y, m + 1, 0).getDate();
+  const P = 14, XD = 10, YD = 6;
+  const X = d => P + (d / dim) * (W - 2 * P);
+  const grid = [];
+  for (let i = 0; i <= XD; i++){ const x = P + i * (W - 2 * P) / XD; grid.push(`<line x1="${x}" y1="${P}" x2="${x}" y2="${H - P}" stroke="var(--grat)" stroke-width="1" ${i === XD / 2 ? 'stroke-dasharray="2 3" stroke="var(--grat-strong)"' : ""}/>`); }
+  for (let j = 0; j <= YD; j++){ const yy = P + j * (H - 2 * P) / YD; grid.push(`<line x1="${P}" y1="${yy}" x2="${W - P}" y2="${yy}" stroke="var(--grat)" stroke-width="1"/>`); }
+  // minor ticks on the centre axes, like a real graticule
+  for (let i = 0; i <= XD * 5; i++){ const x = P + i * (W - 2 * P) / (XD * 5); grid.push(`<line x1="${x}" y1="${H / 2 - 3}" x2="${x}" y2="${H / 2 + 3}" stroke="var(--grat-strong)" stroke-width="1"/>`); }
+
+  let trace = "", glow = "", marks = "", marker = "";
+  if (done){
+    const daily = new Array(dim + 1).fill(0);
+    done.forEach(f => { const d = Number(dayPart(f.IssueDate).slice(8, 10)); if (d >= 1 && d <= dim) daily[d] += invTotal(f); });
+    const cum = [0]; for (let d = 1; d <= dim; d++) cum[d] = cum[d - 1] + daily[d];
+    const top = cum[td] || 0;
+    const step = niceStep(Math.max(top, 1000) * 1.15 / YD);
+    const max = step * YD;
+    const Y = v => H - P - (v / max) * (H - 2 * P);
+    let d = `M${X(0)},${Y(0)}`;
+    for (let i = 1; i <= td; i++){
+      if (daily[i]){ d += ` H${X(i - .5)} V${Y(cum[i])}`; marks += `<circle cx="${X(i - .5)}" cy="${Y(cum[i])}" r="4" fill="var(--pcb)" stroke="var(--screen)" stroke-width="2"/>`; }
+    }
+    d += ` H${X(td)}`;
+    trace = `<path d="${d}" fill="none" stroke="var(--pcb)" stroke-width="2" stroke-linejoin="round"/>`;
+    glow = `<path d="${d}" fill="none" stroke="var(--pcb)" stroke-opacity=".14" stroke-width="8" stroke-linejoin="round"/>`;
+    marker = `<line x1="${X(td)}" y1="${P}" x2="${X(td)}" y2="${H - P}" stroke="var(--amber)" stroke-width="1.5" stroke-dasharray="4 3"/>
+      <circle cx="${X(td)}" cy="${Y(top)}" r="5" fill="var(--amber)" stroke="var(--screen)" stroke-width="2"/>`;
+    $("#scopeScale").textContent = `${ILS0.format(step)} למשבצת`;
+    $("#scopeFoot").innerHTML = done.length
+      ? `הקו עולה בכל יום שבו הופק מסמך. הקו המקווקו מסמן את היום.`
+      : `עוד לא הופקו מסמכים החודש. הקו יעלה ברגע שחשבונית תסומן כ״הופק״.`;
+    scopeData = { daily, cum, td, dim, X, Y, m, y };
+    el.setAttribute("aria-label", `הכנסה מצטברת מתחילת ${now.toLocaleDateString("he-IL", {month:"long"})}: ${ILS0.format(top)}`);
+  } else {
+    scopeData = null; $("#scopeScale").textContent = ""; $("#scopeFoot").textContent = state.err.Invoices ? state.err.Invoices : "";
+  }
+  let svg = el.querySelector("svg");
+  if (!svg){ svg = document.createElementNS("http://www.w3.org/2000/svg", "svg"); svg.setAttribute("aria-hidden", "true"); el.prepend(svg); }
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  svg.innerHTML = grid.join("") + glow + trace + marker + marks +
+    `<line id="xhair" x1="0" y1="${P}" x2="0" y2="${H - P}" stroke="var(--ink)" stroke-opacity=".45" stroke-width="1" visibility="hidden"/>`;
+  el.setAttribute("role", "img");
+
+  const ticks = [1, 8, 15, 22, dim];
+  const off = el.getBoundingClientRect().left - axis.getBoundingClientRect().left;
+  axis.innerHTML = ticks.map(d => `<span style="left:${X(d - .5) + off}px">${pad2(d)}/${pad2(m + 1)}</span>`).join("");
+}
+function scopeHover(e){
+  const tip = $("#scopeTip"), xh = $("#xhair");
+  if (!scopeData || !xh) return;
+  const el = $("#scope"), r = el.getBoundingClientRect();
+  const { daily, cum, td, dim, X, Y, m, y } = scopeData;
+  const P = 14, W = r.width;
+  let d = Math.round(((e.clientX - r.left) - P) / (W - 2 * P) * dim + .5);
+  d = Math.max(1, Math.min(td, d));
+  const x = X(d - .5);
+  xh.setAttribute("x1", x); xh.setAttribute("x2", x); xh.setAttribute("visibility", "visible");
+  tip.innerHTML = `${pad2(d)}/${pad2(m + 1)}/${y} · מצטבר <b>${ILS0.format(cum[d])}</b>${daily[d] ? `<br>הופק ביום זה: <b>${ILS0.format(daily[d])}</b>` : ""}`;
+  tip.style.left = Math.max(90, Math.min(W - 90, x)) + "px";
+  tip.style.top = Math.max(56, Y(cum[d])) + "px";
+  tip.style.opacity = 1;
+}
+function scopeLeave(){ const xh = $("#xhair"); if (xh) xh.setAttribute("visibility", "hidden"); $("#scopeTip").style.opacity = 0; }
+
+/* ---------- toasts ---------- */
+function toast(msg, bad){
+  const t = document.createElement("div"); t.className = "toast" + (bad ? " bad" : ""); t.textContent = msg;
+  $("#toasts").append(t); setTimeout(() => t.remove(), 4200);
+}
+
+/* ---------- mode badge ---------- */
+function refreshMode(){
+  const demo = isDemo(), b = $("#modeBadge");
+  b.className = "badge-mode " + (demo ? "demo" : "live");
+  let host = ""; try { host = new URL(cfg().url).host; } catch {}
+  $("#modeText").innerHTML = demo ? '<span class="mode-long">מצב </span>הדגמה' : '<span class="mode-long">מחובר ל-</span>n8n';
+  b.title = demo ? "נתונים לדוגמה בזיכרון. לחצו כדי להתחבר ל-n8n" : `מחובר אל ${host}`;
+  $("#footMode").textContent = demo ? "מצב הדגמה · נתונים לדוגמה" : `מחובר · ${host}`;
+}
+
+/* ---------- forms ---------- */
+function openDialog(id){
+  const d = document.getElementById(id); if (!d) return;
+  const f = d.querySelector("form");
+  if (id !== "dlgSettings"){ f.reset(); const e = f.querySelector(".formerr"); if (e) e.textContent = ""; }
+  if (id === "dlgInvoice"){ $("#iDate").value = todayISO(); updateVat(); }
+  if (id === "dlgSettings"){ $("#setUrl").value = cfg().url; $("#setKey").value = cfg().key; $("#setErr").textContent = ""; $("#testRes").textContent = ""; }
+  d.showModal();
+  const first = d.querySelector("input,select,textarea"); if (first) first.focus();
+}
+function updateVat(){
+  const amt = parseFloat($("#iAmount").value), date = $("#iDate").value, rate = vatRateFor(date);
+  $("#vRateL").textContent = `מע״מ ${Math.round(rate * 100)}%`;
+  if (!(amt > 0)){ $("#vAmt").textContent = $("#vVat").textContent = $("#vTot").textContent = "—"; return; }
+  $("#vAmt").textContent = money(amt); $("#vVat").textContent = money(round2(amt * rate)); $("#vTot").textContent = money(round2(amt * (1 + rate)));
+}
+function formErrors(form){
+  const bad = [...form.elements].filter(el => el.willValidate && !el.checkValidity());
+  if (!bad.length) return "";
+  bad[0].focus();
+  const names = bad.map(el => (form.querySelector(`label[for="${el.id}"]`)?.childNodes[0]?.textContent || el.name).trim());
+  return "יש להשלים או לתקן: " + names.join(", ");
+}
+async function submitCreate(e, table, build, okMsg){
+  e.preventDefault();
+  const form = e.target, err = form.querySelector(".formerr"), btn = form.querySelector('[type="submit"]');
+  const msg = formErrors(form);
+  if (msg){ err.textContent = msg; return; }
+  err.textContent = ""; btn.disabled = true; const label = btn.textContent; btn.textContent = "שומר…";
+  try {
+    await api("create", { table, payload: build(new FormData(form)) });
+    form.closest("dialog").close();
+    toast(okMsg);
+    loadTable(table, true);
+  } catch (ex) {
+    err.textContent = ex.message || "השמירה נכשלה";
+  } finally { btn.disabled = false; btn.textContent = label; }
+}
+const clean = o => Object.fromEntries(Object.entries(o).filter(([, v]) => v !== "" && v != null));
+
+/* ---------- chat ---------- */
+const chat = [];
+let chatBusy = false, lastFocus = null;
+function renderChat(){
+  const box = $("#msgs");
+  let html = `<div class="msg bot"><span class="who">הסוכן</span>שלום! אני הסוכן של קילוהרץ. אפשר לשאול אותי על הכנסות, חשבוניות פתוחות, לידים ומשימות.</div>`;
+  if (!chat.length) html += `<div class="suggest" aria-label="שאלות לדוגמה">${["כמה הכנסות היו החודש?", "אילו חשבוניות עדיין פתוחות?", "מה המשימות הדחופות שלי?"].map(s => `<button type="button" data-suggest="${esc(s)}">${esc(s)}</button>`).join("")}</div>`;
+  html += chat.map(c => `<div class="msg ${c.role === "me" ? "me" : "bot"}${c.err ? " err" : ""}">${c.role === "me" ? "" : `<span class="who">${c.err ? "שגיאה" : "הסוכן"}</span>`}${esc(c.text)}</div>`).join("");
+  if (chatBusy) html += `<div class="msg bot" aria-label="הסוכן מקליד"><span class="typing"><i></i><i></i><i></i></span></div>`;
+  box.innerHTML = html; box.scrollTop = box.scrollHeight;
+}
+async function sendChat(text){
+  text = text.trim(); if (!text || chatBusy) return;
+  chat.push({ role:"me", text }); chatBusy = true; renderChat();
+  $("#chatSend").disabled = true;
+  try {
+    const res = await api("chat", { message:text, sessionId });
+    chat.push({ role:"bot", text: typeof res.reply === "string" && res.reply.trim() ? res.reply : "הסוכן החזיר תשובה ריקה. נסו לנסח את השאלה מחדש." });
+  } catch (e) {
+    chat.push({ role:"bot", err:true, text:e.message || "השליחה נכשלה" });
+  } finally { chatBusy = false; $("#chatSend").disabled = false; renderChat(); }
+}
+function openChat(){
+  lastFocus = document.activeElement;
+  $("#drawer").classList.add("on"); $("#scrim").classList.add("on");
+  renderChat(); setTimeout(() => $("#chatInput").focus(), 60);
+}
+function closeChat(){
+  $("#drawer").classList.remove("on"); $("#scrim").classList.remove("on");
+  if (lastFocus) lastFocus.focus();
+}
+
+/* ---------- wire up ---------- */
+function init(){
+  buildShell();
+  $("#sessionLabel").textContent = sessionId;
+  refreshMode();
+
+  document.addEventListener("click", e => {
+    const t = e.target.closest("[data-view-btn],[data-goto],[data-open],[data-reload],[data-close],[data-suggest]");
+    if (!t) return;
+    if (t.dataset.viewBtn) show(t.dataset.viewBtn);
+    else if (t.dataset.goto){ show(t.dataset.goto); $("#content").focus(); }
+    else if (t.dataset.open) openDialog(t.dataset.open);
+    else if (t.dataset.reload) loadTable(t.dataset.reload);
+    else if (t.hasAttribute("data-close")) t.closest("dialog").close();
+    else if (t.dataset.suggest) sendChat(t.dataset.suggest);
+  });
+  document.addEventListener("input", e => {
+    const t = e.target;
+    if (t.dataset.q){ state.q[t.dataset.q] = t.value; renderTable(t.dataset.q); }
+    if (t.id === "iAmount" || t.id === "iDate") updateVat();
+  });
+  document.addEventListener("change", e => {
+    const t = e.target;
+    if (t.dataset.f){ state.f[t.dataset.f] = t.value; renderTable(t.dataset.f); }
+    if (t.id === "iDate") updateVat();
+  });
+  $$("dialog.modal").forEach(d => d.addEventListener("click", e => { if (e.target === d) d.close(); }));
+
+  $("#refreshAll").addEventListener("click", () => loadAll());
+  $("#openSettings").addEventListener("click", () => openDialog("dlgSettings"));
+  $("#modeBadge").addEventListener("click", () => openDialog("dlgSettings"));
+  $("#openChat").addEventListener("click", openChat);
+  $("#closeChat").addEventListener("click", closeChat);
+  $("#scrim").addEventListener("click", closeChat);
+  document.addEventListener("keydown", e => {
+    if (e.key === "Escape" && $("#drawer").classList.contains("on")) closeChat();
+    if (e.key === "Tab" && $("#drawer").classList.contains("on")){
+      const f = $$("#drawer button:not([disabled]), #drawer textarea"); const first = f[0], last = f[f.length - 1];
+      if (e.shiftKey && document.activeElement === first){ e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last){ e.preventDefault(); first.focus(); }
+    }
+  });
+  $("#chatForm").addEventListener("submit", e => { e.preventDefault(); const v = $("#chatInput").value; $("#chatInput").value = ""; sendChat(v); });
+  $("#chatInput").addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey){ e.preventDefault(); $("#chatForm").requestSubmit(); } });
+
+  $("#invoiceForm").addEventListener("submit", e => submitCreate(e, "Invoices", fd => clean({
+    DocType: fd.get("DocType"), Amount: round2(parseFloat(fd.get("Amount"))), CustomerId: fd.get("CustomerId").trim().toUpperCase(),
+    CustomerName: fd.get("CustomerName").trim(), CustomerEmail: fd.get("CustomerEmail").trim(), IssueDate: fd.get("IssueDate"),
+    Notes: fd.get("Notes").trim(), Status: "New"
+  }), "החשבונית נוצרה ונשלחה לאימות"));
+  $("#leadForm").addEventListener("submit", e => submitCreate(e, "Leads", fd => clean({
+    Name: fd.get("Name").trim(), Email: fd.get("Email").trim().toLowerCase(), Phone: fd.get("Phone").trim(), Company: fd.get("Company").trim(),
+    Source: fd.get("Source"), Interest: fd.get("Interest"), Notes: fd.get("Notes").trim(), Status: "New"
+  }), "הליד נוצר"));
+  $("#taskForm").addEventListener("submit", e => submitCreate(e, "Tasks", fd => clean({
+    Title: fd.get("Title").trim(), Priority: fd.get("Priority"), DueDate: fd.get("DueDate"), Status: "Open", Source: "App"
+  }), "המשימה נוצרה"));
+
+  // settings
+  $("#toggleKey").addEventListener("click", e => {
+    const k = $("#setKey"), on = k.type === "password"; k.type = on ? "text" : "password";
+    e.currentTarget.textContent = on ? "הסתרה" : "הצגה"; e.currentTarget.setAttribute("aria-pressed", on);
+  });
+  const validUrl = u => { try { const x = new URL(u); return x.protocol === "https:" || /^(localhost|127\.0\.0\.1)$/.test(x.hostname); } catch { return false; } };
+  const saveSettings = () => {
+    const url = $("#setUrl").value.trim(), key = $("#setKey").value.trim();
+    if (url && !validUrl(url)){ $("#setErr").textContent = "הכתובת צריכה להתחיל ב-https:// (או http://localhost לשרת n8n מקומי)."; $("#setUrl").focus(); return false; }
+    if (url && !key){ $("#setErr").textContent = "בלי מפתח API ה-Webhook ידחה את הבקשה. הזינו את הערך שהוגדר ב-Header Auth."; $("#setKey").focus(); return false; }
+    $("#setErr").textContent = "";
+    store.set("khz.webhookUrl", url); store.set("khz.apiKey", url ? key : "");
+    return true;
+  };
+  $("#settingsForm").addEventListener("submit", e => {
+    e.preventDefault(); if (!saveSettings()) return;
+    $("#dlgSettings").close(); refreshMode();
+    state.data = { Invoices:null, Leads:null, Products:null, Tasks:null };
+    toast(isDemo() ? "עובדים במצב הדגמה" : "ההגדרות נשמרו. טוען נתונים מ-n8n…");
+    loadAll();
+  });
+  $("#testConn").addEventListener("click", async e => {
+    if (!saveSettings()) return;
+    refreshMode();
+    const r = $("#testRes"), b = e.currentTarget; b.disabled = true; r.className = "testres"; r.textContent = "בודק…";
+    try { const res = await api("list", { table:"Tasks" }); r.className = "testres ok"; r.textContent = (isDemo() ? "מצב הדגמה פעיל. " : "החיבור תקין. ") + `התקבלו ${(res.records || []).length} משימות.`; }
+    catch (ex) { r.className = "testres bad"; r.textContent = ex.message; }
+    finally { b.disabled = false; }
+  });
+  $("#goDemo").addEventListener("click", () => {
+    store.set("khz.webhookUrl", ""); store.set("khz.apiKey", "");
+    $("#dlgSettings").close(); refreshMode();
+    state.data = { Invoices:null, Leads:null, Products:null, Tasks:null };
+    toast("חזרתם למצב הדגמה"); loadAll();
+  });
+
+  const scope = $("#scope");
+  scope.addEventListener("pointermove", scopeHover);
+  scope.addEventListener("pointerleave", scopeLeave);
+  let rz; new ResizeObserver(() => { clearTimeout(rz); rz = setTimeout(() => { if (state.view === "dashboard") renderDashboard(); }, 80); }).observe(scope);
+  window.addEventListener("hashchange", () => show(location.hash.slice(1)));
+
+  show(location.hash.slice(1) || "dashboard");
+  loadAll();
+}
+init();
+</script>
+</body>
+</html>
