@@ -1,0 +1,261 @@
+{
+  "version": "1.0.0",
+  "base": {
+    "name": "Kilohertz ERP",
+    "business": "קילוהרץ אלקטרוניקה (Kilohertz Electronics)",
+    "platform": "Airtable",
+    "description": "מקור האמת למודל הנתונים של מערכת ה-ERP-AI. ארבע טבלאות ליבה (core: true) נדרשות לעשרת התהליכים; עשר טבלאות מורחבות (core: false) מתועדות להרחבה עתידית ואינן בשימוש התהליכים. הבסיס מוקם ריק, בלי נתוני דמו.",
+    "placeholderBaseId": "appXXXXXXXXXXXXXX"
+  },
+  "conventions": {
+    "fieldNames": "שמות השדות באנגלית, PascalCase, ומוקלדים ב-Airtable בדיוק כפי שהם מופיעים כאן (רגיש לאותיות גדולות וקטנות).",
+    "statusFields": "שדות Status (וגם DocType, Priority, Source) הם singleLineText ולא singleSelect, כדי שתהליך שכותב ערך חדש לא ייכשל. הערכים המותרים מתועדים ב-allowedValues ונאכפים בתהליכים.",
+    "foreignKeys": "קשרים בין טבלאות הם מפתחות טקסט קריאים (למשל CUST-0001, ORD-0001, SUP-0001) ולא שדות Linked record.",
+    "createdField": "השדה Created חייב להיות מסוג Created time. טריגרי Airtable ב-n8n סורקים לפיו, ובלעדיו התהליכים לא יופעלו.",
+    "currency": "שדות currency מוגדרים בשקלים (סימן ₪, שתי ספרות אחרי הנקודה). Amount הוא סכום לפני מע\"מ.",
+    "percent": "שדות percent נשמרים ב-API כשבר עשרוני: 18% נכתב ונקרא כ-0.18.",
+    "dates": "שדות date נכתבים ב-API בפורמט ISO (YYYY-MM-DD) ומוצגים בממשק בפורמט dd/mm/yyyy.",
+    "ids": "מזהי רשומה (rec...) נוצרים על ידי Airtable; מזהים עסקיים (CustomerId, Sku) מנוהלים על ידי העסק.",
+    "skuPrefix": "KHZ-"
+  },
+  "tables": [
+    {
+      "name": "Invoices",
+      "hebrewName": "חשבוניות ומסמכי מס",
+      "core": true,
+      "usedBy": ["WF01", "WF08", "WF09", "WF13"],
+      "description": "כל מסמך מס (חשבונית, חשבונית מס, קבלה) עובר כאן את מחזור החיים New → Pending | Invalid → Done.",
+      "primaryField": "InvoiceNumber",
+      "fields": [
+        { "name": "InvoiceNumber", "airtableType": "number", "description": "מספר רץ לפי סוג המסמך. נקבע על ידי WF08 בעת ההפקה; ריק עד אז.", "required": false, "example": 1007 },
+        { "name": "DocType", "airtableType": "singleLineText", "description": "סוג המסמך.", "required": true, "allowedValues": ["חשבונית", "חשבונית מס", "קבלה"], "example": "חשבונית מס" },
+        { "name": "CustomerId", "airtableType": "singleLineText", "description": "מפתח טקסט ללקוח (טבלת Customers).", "required": true, "example": "CUST-0001" },
+        { "name": "CustomerName", "airtableType": "singleLineText", "description": "שם הלקוח כפי שיופיע על המסמך.", "required": true, "example": "סטודיו גל-אור בע\"מ" },
+        { "name": "CustomerEmail", "airtableType": "email", "description": "כתובת המייל של הלקוח.", "required": false, "example": "office@gal-or.example" },
+        { "name": "IssueDate", "airtableType": "date", "description": "תאריך המסמך. קובע את שיעור המע\"מ (17% לפני 01/01/2025, 18% מאז).", "required": true, "example": "2026-10-04" },
+        { "name": "Amount", "airtableType": "currency", "description": "סכום לפני מע\"מ, בשקלים.", "required": true, "example": 1250.00 },
+        { "name": "VatRate", "airtableType": "percent", "description": "שיעור המע\"מ שהוחל. מחושב ב-WF01 (נשמר כ-0.18).", "required": false, "example": 0.18 },
+        { "name": "VatAmount", "airtableType": "currency", "description": "סכום המע\"מ. מחושב ב-WF01.", "required": false, "example": 225.00 },
+        { "name": "Total", "airtableType": "currency", "description": "סכום כולל מע\"מ. מחושב ב-WF01.", "required": false, "example": 1475.00 },
+        { "name": "Status", "airtableType": "singleLineText", "description": "מצב המסמך. New בעת יצירה; WF01 מעביר ל-Pending או Invalid; WF08 מעביר ל-Done.", "required": true, "allowedValues": ["New", "Pending", "Invalid", "Done"], "example": "Pending" },
+        { "name": "PdfUrl", "airtableType": "url", "description": "קישור לקובץ המסמך בגוגל דרייב. נכתב על ידי WF08.", "required": false, "example": "https://drive.google.com/file/d/EXAMPLE_FILE_ID/view" },
+        { "name": "Notes", "airtableType": "multilineText", "description": "הערות חופשיות, וגם סיבת פסילה שנכתבת על ידי WF01.", "required": false, "example": "שני מטעני USB-C ורמקול נייד" },
+        { "name": "Created", "airtableType": "createdTime", "description": "זמן יצירת הרשומה. נדרש לטריגר של WF01.", "required": true, "example": "2026-10-04T08:15:00.000Z" }
+      ]
+    },
+    {
+      "name": "Leads",
+      "hebrewName": "לידים",
+      "core": true,
+      "usedBy": ["WF03", "WF04a", "WF04b", "WF13"],
+      "description": "לקוחות פוטנציאליים. מחזור חיים: New → Contacted → Replied, או Unsubscribed כשהליד ביקש הסרה. ליד עם מייל שכבר קיים נדחה ב-WF03 (HTTP 409) ולא נרשם בכלל.",
+      "primaryField": "Name",
+      "fields": [
+        { "name": "Name", "airtableType": "singleLineText", "description": "שם מלא של איש הקשר.", "required": true, "example": "יעל ברקוביץ" },
+        { "name": "Email", "airtableType": "email", "description": "כתובת מייל. משמשת לזיהוי כפילויות (WF03) ולהתאמת תשובות (WF04b).", "required": true, "example": "yael.b@example.com" },
+        { "name": "Phone", "airtableType": "phoneNumber", "description": "מספר טלפון.", "required": false, "example": "052-5550142" },
+        { "name": "Company", "airtableType": "singleLineText", "description": "שם החברה או העסק, אם יש.", "required": false, "example": "משרד אדריכלים ברקוביץ" },
+        { "name": "Source", "airtableType": "singleLineText", "description": "מאיפה הגיע הליד.", "required": false, "allowedValues": ["Website", "Facebook", "Event", "Phone", "App"], "example": "Website" },
+        { "name": "Interest", "airtableType": "singleLineText", "description": "במה הליד מתעניין, בתיאור קצר.", "required": false, "example": "רמקולים לחדר ישיבות" },
+        { "name": "Status", "airtableType": "singleLineText", "description": "מצב הליד בתהליך המכירה. New בעת יצירה; WF04a מעביר ל-Contacted; WF04b מעביר ל-Replied, או ל-Unsubscribed כשהתשובה כוללת \"הסר\". ליד ב-Unsubscribed לא מקבל פניות נוספות.", "required": true, "allowedValues": ["New", "Contacted", "Replied", "Unsubscribed"], "example": "New" },
+        { "name": "LastContacted", "airtableType": "date", "description": "התאריך שבו נשלחה הפנייה האחרונה. מתעדכן ב-WF04a.", "required": false, "example": "2026-10-05" },
+        { "name": "Notes", "airtableType": "multilineText", "description": "הערות, כולל תוכן ההודעה המקורית מהטופס.", "required": false, "example": "ביקש הצעה ל-6 יחידות" },
+        { "name": "Created", "airtableType": "createdTime", "description": "זמן יצירת הרשומה.", "required": true, "example": "2026-10-05T10:02:00.000Z" }
+      ]
+    },
+    {
+      "name": "Products",
+      "hebrewName": "מוצרים",
+      "core": true,
+      "usedBy": ["WF07", "WF13"],
+      "description": "קטלוג המוצרים. WF07 בונה ממנו את המאגר הווקטורי kilohertz_products שסוכן השירות שולף ממנו.",
+      "primaryField": "Sku",
+      "fields": [
+        { "name": "Sku", "airtableType": "singleLineText", "description": "מק\"ט ייחודי בתבנית KHZ-.", "required": true, "example": "KHZ-AUD-0112" },
+        { "name": "Name", "airtableType": "singleLineText", "description": "שם המוצר.", "required": true, "example": "רמקול בלוטות' נייד עמיד למים" },
+        { "name": "Category", "airtableType": "singleLineText", "description": "קו מוצרים.", "required": true, "allowedValues": ["אודיו", "בית חכם", "אביזרי מחשב", "אביזרי טלפון", "כבלים וטעינה", "גיימינג", "לבישים"], "example": "אודיו" },
+        { "name": "Price", "airtableType": "currency", "description": "מחיר לצרכן כולל מע\"מ, בשקלים.", "required": true, "example": 349.90 },
+        { "name": "Description", "airtableType": "multilineText", "description": "תיאור שיווקי ומפרט עיקרי. זה הטקסט שהסוכן יסתמך עליו.", "required": false, "example": "סוללה ל-12 שעות, תקן IPX7, חיבור USB-C." },
+        { "name": "InStock", "airtableType": "checkbox", "description": "האם המוצר זמין במלאי.", "required": false, "example": true }
+      ]
+    },
+    {
+      "name": "Tasks",
+      "hebrewName": "משימות",
+      "core": true,
+      "usedBy": ["WF04b", "WF09", "WF13"],
+      "description": "משימות לצוות. נוצרות ידנית, מהאפליקציה, מתשובת ליד (WF04b) או על ידי סוכן המנהל (WF09).",
+      "primaryField": "Title",
+      "fields": [
+        { "name": "Title", "airtableType": "singleLineText", "description": "תיאור קצר של המשימה.", "required": true, "example": "לחזור ליעל ברקוביץ עם הצעת מחיר" },
+        { "name": "Status", "airtableType": "singleLineText", "description": "מצב המשימה.", "required": true, "allowedValues": ["Open", "Done"], "example": "Open" },
+        { "name": "Priority", "airtableType": "singleLineText", "description": "עדיפות.", "required": false, "allowedValues": ["נמוכה", "רגילה", "גבוהה"], "example": "רגילה" },
+        { "name": "DueDate", "airtableType": "date", "description": "תאריך יעד.", "required": false, "example": "2026-10-07" },
+        { "name": "Source", "airtableType": "singleLineText", "description": "מי יצר את המשימה.", "required": false, "allowedValues": ["Manager Agent", "Sales Reply", "App", "Manual"], "example": "Sales Reply" },
+        { "name": "Created", "airtableType": "createdTime", "description": "זמן יצירת הרשומה.", "required": true, "example": "2026-10-05T11:30:00.000Z" }
+      ]
+    },
+    {
+      "name": "Customers",
+      "hebrewName": "לקוחות",
+      "core": false,
+      "usedBy": [],
+      "description": "כרטיס לקוח. CustomerId הוא היעד של מפתחות הטקסט בטבלאות אחרות.",
+      "primaryField": "CustomerId",
+      "fields": [
+        { "name": "CustomerId", "airtableType": "singleLineText", "description": "מזהה לקוח עסקי.", "required": true, "example": "CUST-0001" },
+        { "name": "Name", "airtableType": "singleLineText", "description": "שם הלקוח או העסק.", "required": true, "example": "סטודיו גל-אור בע\"מ" },
+        { "name": "Email", "airtableType": "email", "description": "מייל ראשי.", "required": false, "example": "office@gal-or.example" },
+        { "name": "Phone", "airtableType": "phoneNumber", "description": "טלפון.", "required": false, "example": "03-5550190" },
+        { "name": "TaxId", "airtableType": "singleLineText", "description": "ח.פ. או ע.מ. לצורך מסמכי מס.", "required": false, "example": "515555555" },
+        { "name": "City", "airtableType": "singleLineText", "description": "עיר למשלוח.", "required": false, "example": "רמת גן" },
+        { "name": "Created", "airtableType": "createdTime", "description": "זמן יצירת הרשומה.", "required": true, "example": "2026-09-01T09:00:00.000Z" }
+      ]
+    },
+    {
+      "name": "Suppliers",
+      "hebrewName": "ספקים",
+      "core": false,
+      "usedBy": [],
+      "description": "ספקים ויבואנים.",
+      "primaryField": "SupplierId",
+      "fields": [
+        { "name": "SupplierId", "airtableType": "singleLineText", "description": "מזהה ספק.", "required": true, "example": "SUP-0003" },
+        { "name": "Name", "airtableType": "singleLineText", "description": "שם הספק.", "required": true, "example": "אורבן סאונד יבוא" },
+        { "name": "ContactName", "airtableType": "singleLineText", "description": "איש קשר.", "required": false, "example": "רון שגיא" },
+        { "name": "Email", "airtableType": "email", "description": "מייל להזמנות.", "required": false, "example": "orders@urbansound.example" },
+        { "name": "Categories", "airtableType": "singleLineText", "description": "קווי המוצרים שהספק מספק.", "required": false, "example": "אודיו, גיימינג" },
+        { "name": "PaymentTerms", "airtableType": "singleLineText", "description": "תנאי תשלום.", "required": false, "example": "שוטף + 30" }
+      ]
+    },
+    {
+      "name": "Orders",
+      "hebrewName": "הזמנות",
+      "core": false,
+      "usedBy": [],
+      "description": "הזמנות לקוח מהחנות או מהאתר.",
+      "primaryField": "OrderId",
+      "fields": [
+        { "name": "OrderId", "airtableType": "singleLineText", "description": "מזהה הזמנה.", "required": true, "example": "ORD-0451" },
+        { "name": "CustomerId", "airtableType": "singleLineText", "description": "מפתח טקסט ללקוח.", "required": true, "example": "CUST-0001" },
+        { "name": "OrderDate", "airtableType": "date", "description": "תאריך ההזמנה.", "required": true, "example": "2026-10-02" },
+        { "name": "Items", "airtableType": "multilineText", "description": "שורות ההזמנה: מק\"ט, כמות ומחיר בכל שורה.", "required": true, "example": "KHZ-AUD-0112 x2 @ 349.90" },
+        { "name": "Total", "airtableType": "currency", "description": "סכום ההזמנה כולל מע\"מ.", "required": true, "example": 699.80 },
+        { "name": "Status", "airtableType": "singleLineText", "description": "מצב ההזמנה.", "required": true, "allowedValues": ["Received", "Packed", "Shipped", "Delivered", "Cancelled"], "example": "Shipped" },
+        { "name": "Created", "airtableType": "createdTime", "description": "זמן יצירת הרשומה.", "required": true, "example": "2026-10-02T14:20:00.000Z" }
+      ]
+    },
+    {
+      "name": "TaxInvoices",
+      "hebrewName": "חשבוניות מס (ארכיון)",
+      "core": false,
+      "usedBy": [],
+      "description": "הפרדה עתידית של חשבוניות מס שהופקו, לצורך דיווח ומספרי הקצאה.",
+      "primaryField": "TaxInvoiceNumber",
+      "fields": [
+        { "name": "TaxInvoiceNumber", "airtableType": "number", "description": "מספר חשבונית המס.", "required": true, "example": 2031 },
+        { "name": "OrderId", "airtableType": "singleLineText", "description": "מפתח טקסט להזמנה.", "required": false, "example": "ORD-0451" },
+        { "name": "CustomerId", "airtableType": "singleLineText", "description": "מפתח טקסט ללקוח.", "required": true, "example": "CUST-0001" },
+        { "name": "IssueDate", "airtableType": "date", "description": "תאריך ההפקה.", "required": true, "example": "2026-10-02" },
+        { "name": "Total", "airtableType": "currency", "description": "סכום כולל מע\"מ.", "required": true, "example": 699.80 },
+        { "name": "AllocationNumber", "airtableType": "singleLineText", "description": "מספר הקצאה מרשות המסים, כשנדרש.", "required": false, "example": "" }
+      ]
+    },
+    {
+      "name": "Receipts",
+      "hebrewName": "קבלות",
+      "core": false,
+      "usedBy": [],
+      "description": "תיעוד תקבולים.",
+      "primaryField": "ReceiptNumber",
+      "fields": [
+        { "name": "ReceiptNumber", "airtableType": "number", "description": "מספר קבלה.", "required": true, "example": 880 },
+        { "name": "CustomerId", "airtableType": "singleLineText", "description": "מפתח טקסט ללקוח.", "required": true, "example": "CUST-0001" },
+        { "name": "PaymentDate", "airtableType": "date", "description": "תאריך התשלום.", "required": true, "example": "2026-10-03" },
+        { "name": "Amount", "airtableType": "currency", "description": "הסכום שהתקבל.", "required": true, "example": 699.80 },
+        { "name": "PaymentMethod", "airtableType": "singleLineText", "description": "אמצעי תשלום.", "required": false, "allowedValues": ["אשראי", "העברה בנקאית", "מזומן", "ביט"], "example": "אשראי" },
+        { "name": "InvoiceRef", "airtableType": "singleLineText", "description": "מספר המסמך שהקבלה משלמת.", "required": false, "example": "2031" }
+      ]
+    },
+    {
+      "name": "Quotes",
+      "hebrewName": "הצעות מחיר",
+      "core": false,
+      "usedBy": [],
+      "description": "הצעות מחיר ללקוחות עסקיים.",
+      "primaryField": "QuoteId",
+      "fields": [
+        { "name": "QuoteId", "airtableType": "singleLineText", "description": "מזהה הצעה.", "required": true, "example": "QT-0027" },
+        { "name": "CustomerId", "airtableType": "singleLineText", "description": "מפתח טקסט ללקוח או לליד.", "required": true, "example": "CUST-0014" },
+        { "name": "Items", "airtableType": "multilineText", "description": "פריטים וכמויות.", "required": true, "example": "KHZ-SMH-0040 x6" },
+        { "name": "Amount", "airtableType": "currency", "description": "סכום לפני מע\"מ.", "required": true, "example": 2340.00 },
+        { "name": "ValidUntil", "airtableType": "date", "description": "תוקף ההצעה.", "required": false, "example": "2026-10-31" },
+        { "name": "Status", "airtableType": "singleLineText", "description": "מצב ההצעה.", "required": true, "allowedValues": ["Draft", "Sent", "Accepted", "Rejected"], "example": "Sent" }
+      ]
+    },
+    {
+      "name": "Expenses",
+      "hebrewName": "הוצאות",
+      "core": false,
+      "usedBy": [],
+      "description": "הוצאות העסק לצורך מעקב רווחיות.",
+      "primaryField": "Description",
+      "fields": [
+        { "name": "Description", "airtableType": "singleLineText", "description": "תיאור ההוצאה.", "required": true, "example": "רכש מלאי אוזניות" },
+        { "name": "Category", "airtableType": "singleLineText", "description": "סיווג.", "required": false, "allowedValues": ["מלאי", "שכירות", "שיווק", "תוכנה", "משלוחים", "אחר"], "example": "מלאי" },
+        { "name": "SupplierId", "airtableType": "singleLineText", "description": "מפתח טקסט לספק.", "required": false, "example": "SUP-0003" },
+        { "name": "ExpenseDate", "airtableType": "date", "description": "תאריך ההוצאה.", "required": true, "example": "2026-09-28" },
+        { "name": "Amount", "airtableType": "currency", "description": "סכום כולל מע\"מ.", "required": true, "example": 8420.00 },
+        { "name": "ReceiptUrl", "airtableType": "url", "description": "קישור לקבלה הסרוקה.", "required": false, "example": "https://drive.google.com/file/d/EXAMPLE_FILE_ID/view" }
+      ]
+    },
+    {
+      "name": "Employees",
+      "hebrewName": "עובדים",
+      "core": false,
+      "usedBy": [],
+      "description": "צוות העסק. לא נשמרים כאן נתוני שכר.",
+      "primaryField": "FullName",
+      "fields": [
+        { "name": "EmployeeId", "airtableType": "singleLineText", "description": "מזהה עובד.", "required": true, "example": "EMP-004" },
+        { "name": "FullName", "airtableType": "singleLineText", "description": "שם מלא.", "required": true, "example": "אורי מזרחי" },
+        { "name": "Role", "airtableType": "singleLineText", "description": "תפקיד.", "required": false, "example": "מנהל מלאי ורכש" },
+        { "name": "Email", "airtableType": "email", "description": "מייל עבודה.", "required": false, "example": "uri@kilohertz.example" },
+        { "name": "StartDate", "airtableType": "date", "description": "תאריך תחילת עבודה.", "required": false, "example": "2022-03-01" },
+        { "name": "Active", "airtableType": "checkbox", "description": "האם העובד פעיל.", "required": false, "example": true }
+      ]
+    },
+    {
+      "name": "Projects",
+      "hebrewName": "פרויקטים",
+      "core": false,
+      "usedBy": [],
+      "description": "התקנות ופרויקטים ללקוחות עסקיים (למשל התקנת בית חכם במשרד).",
+      "primaryField": "ProjectName",
+      "fields": [
+        { "name": "ProjectId", "airtableType": "singleLineText", "description": "מזהה פרויקט.", "required": true, "example": "PRJ-0009" },
+        { "name": "ProjectName", "airtableType": "singleLineText", "description": "שם הפרויקט.", "required": true, "example": "מערכת שמע לחדר ישיבות" },
+        { "name": "CustomerId", "airtableType": "singleLineText", "description": "מפתח טקסט ללקוח.", "required": true, "example": "CUST-0014" },
+        { "name": "OwnerEmployeeId", "airtableType": "singleLineText", "description": "מפתח טקסט לעובד האחראי.", "required": false, "example": "EMP-002" },
+        { "name": "StartDate", "airtableType": "date", "description": "תאריך התחלה.", "required": false, "example": "2026-10-12" },
+        { "name": "Status", "airtableType": "singleLineText", "description": "מצב הפרויקט.", "required": true, "allowedValues": ["Planned", "Active", "Closed"], "example": "Planned" },
+        { "name": "Budget", "airtableType": "currency", "description": "תקציב לפני מע\"מ.", "required": false, "example": 5600.00 }
+      ]
+    },
+    {
+      "name": "Files",
+      "hebrewName": "קבצים",
+      "core": false,
+      "usedBy": [],
+      "description": "מפתח מרכזי לקבצים שנשמרים בגוגל דרייב.",
+      "primaryField": "FileName",
+      "fields": [
+        { "name": "FileName", "airtableType": "singleLineText", "description": "שם הקובץ.", "required": true, "example": "invoice-1007.html" },
+        { "name": "FileUrl", "airtableType": "url", "description": "קישור לקובץ בדרייב.", "required": true, "example": "https://drive.google.com/file/d/EXAMPLE_FILE_ID/view" },
+        { "name": "RelatedTable", "airtableType": "singleLineText", "description": "שם הטבלה שהקובץ שייך לה.", "required": false, "example": "Invoices" },
+        { "name": "RelatedId", "airtableType": "singleLineText", "description": "מזהה הרשומה הקשורה.", "required": false, "example": "1007" },
+        { "name": "Created", "airtableType": "createdTime", "description": "זמן יצירת הרשומה.", "required": true, "example": "2026-10-04T08:17:00.000Z" }
+      ]
+    }
+  ]
+}
