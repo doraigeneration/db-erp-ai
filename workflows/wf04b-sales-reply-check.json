@@ -1,0 +1,526 @@
+{
+  "id": "khzWf04bReplies",
+  "name": "WF04b · Sales Reply Check",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## WF04b · סוכן מכירות — זיהוי תשובות מלידים\n\n**מה התהליך עושה:** כל 30 דקות בודק מיילים חדשים שלא נקראו בתיבת הדואר הנכנס. לכל מייל מחלץ את כתובת השולח ומחפש ליד עם אותה כתובת בטבלת Leads. הצומת Classify Reply (Switch) מחליט מה לעשות:\n- **בקשת הסרה:** אם בנושא או בתחילת ההודעה מופיעה המילה \"הסר\" כמילה עצמאית (לא \"הסרת\") — הליד מסומן Unsubscribed, בכל סטטוס, ולא נפתחת משימה.\n- **תשובה רגילה:** אחרת, אם הליד בסטטוס Contacted (קיבל מאיתנו מייל ב-WF04a) — מעודכן ל-Replied ונפתחת משימת מעקב בעדיפות גבוהה למחר.\n- כל מייל אחר (שולח שאינו ליד, ליד בסטטוס אחר) — מתעלמים ממנו.\n\n**טריגר:** Gmail Trigger — סריקה כל 30 דקות, רק INBOX ורק הודעות שלא נקראו (פלט מקוצר / Simplify)\n\n**חילוץ השולח:** השדה From מגיע בצורה \"שם <address@domain>\" או ככתובת בלבד — הביטוי בצומת Extract Sender Address מטפל בשני המקרים ומחזיר כתובת באותיות קטנות. בפלט המקוצר של Gmail יש רק תחילת ההודעה (snippet) — וזה מספיק, כי מי שמבקש הסרה כותב זאת בראש התשובה.\n\n**שדות בשימוש:**\n- Leads: Name, Email, Status (Contacted / Replied / Unsubscribed)\n- Tasks: Title, Status, Priority, Source, DueDate\n\n**אחרי הייבוא — חובה:**\n1. בכל צומתי Airtable: לבחור את ה-Base שלכם במקום appXXXXXXXXXXXXXX ולבחור מחדש את הטבלה (Leads / Tasks)\n2. לבחור Credentials: Gmail בטריגר, Airtable בשאר הצמתים\n3. להפעיל (Activate). התהליך לא מסמן מיילים כנקראו ולא עונה ללקוח — רק מעדכן את ה-CRM",
+        "height": 470,
+        "width": 1300,
+        "color": 5
+      },
+      "id": "f22dfafa-40db-4757-ba4f-a40a942a0fd9",
+      "name": "הסבר על התהליך",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -60,
+        -390
+      ]
+    },
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyX",
+              "value": 30,
+              "unit": "minutes"
+            }
+          ]
+        },
+        "simple": true,
+        "filters": {
+          "labelIds": [
+            "INBOX"
+          ],
+          "readStatus": "unread"
+        },
+        "options": {}
+      },
+      "id": "10f7d54d-eba5-444b-a9f5-94f5de343e9d",
+      "name": "Check Inbox Every 30 Minutes",
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        0,
+        300
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "khzGmail0000001",
+          "name": "Gmail - Kilohertz Sales"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "e48e9318-a8f5-4003-9c3b-785f1e713b53",
+              "name": "senderEmail",
+              "value": "={{ ((String($json.From ?? '').match(/<([^>]+)>/) || [])[1] || String($json.From ?? '')).trim().toLowerCase().replace(/['\"]/g, '') }}",
+              "type": "string"
+            },
+            {
+              "id": "000a91d9-fa79-46d4-ac2d-a9851c95537a",
+              "name": "subject",
+              "value": "={{ $json.Subject ?? '' }}",
+              "type": "string"
+            },
+            {
+              "id": "dead560a-510b-4c1e-aea2-2920f13e39c8",
+              "name": "snippet",
+              "value": "={{ $json.snippet ?? '' }}",
+              "type": "string"
+            },
+            {
+              "id": "5c0f0c2f-4839-425e-9218-e1f39beeb401",
+              "name": "gmailMessageId",
+              "value": "={{ $json.id }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "3ee8849f-d02c-427e-9a2f-b5f6fcf84cca",
+      "name": "Extract Sender Address",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        240,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "airtableTokenApi",
+        "resource": "record",
+        "operation": "search",
+        "base": {
+          "__rl": true,
+          "mode": "id",
+          "value": "appXXXXXXXXXXXXXX"
+        },
+        "table": {
+          "__rl": true,
+          "mode": "id",
+          "value": "Leads"
+        },
+        "filterByFormula": "=LOWER({Email})='{{ $json.senderEmail }}'",
+        "returnAll": false,
+        "limit": 1,
+        "options": {}
+      },
+      "id": "438bdb6c-3093-499c-aae2-bc635b69b63b",
+      "name": "Find Lead By Sender",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.2,
+      "position": [
+        480,
+        300
+      ],
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "khzAirtable0001",
+          "name": "Airtable - Kilohertz"
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "007e3bd7-fbc3-4989-b1e7-1c96609463c6",
+                    "leftValue": "={{ $json.id ?? '' }}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "string",
+                      "operation": "notEmpty",
+                      "singleValue": true
+                    }
+                  },
+                  {
+                    "id": "d14779cc-7587-494b-9223-f91aabbe7436",
+                    "leftValue": "={{ /(^|[^א-ת])הסר([^א-ת]|$)/.test(String($('Extract Sender Address').item.json.subject ?? '') + ' ' + String($('Extract Sender Address').item.json.snippet ?? '')) }}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "true",
+                      "singleValue": true
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "unsubscribe"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "976fa84d-a2da-4745-9c38-a5f1124c492b",
+                    "leftValue": "={{ $json.id ?? '' }}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "string",
+                      "operation": "notEmpty",
+                      "singleValue": true
+                    }
+                  },
+                  {
+                    "id": "753a9433-410d-459d-8bfb-f40f9166aae1",
+                    "leftValue": "={{ $json.fields?.Status ?? '' }}",
+                    "rightValue": "Contacted",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "replied"
+            }
+          ]
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "9dc4f028-a4da-4256-99d0-1275149e3130",
+      "name": "Classify Reply",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        720,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "airtableTokenApi",
+        "resource": "record",
+        "operation": "update",
+        "base": {
+          "__rl": true,
+          "mode": "id",
+          "value": "appXXXXXXXXXXXXXX"
+        },
+        "table": {
+          "__rl": true,
+          "mode": "id",
+          "value": "Leads"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "id": "={{ $json.id }}",
+            "Status": "Unsubscribed"
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": false
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "acc1acea-ce34-4847-b36b-4d5aceebae23",
+      "name": "Mark Lead Unsubscribed",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.2,
+      "position": [
+        960,
+        140
+      ],
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "khzAirtable0001",
+          "name": "Airtable - Kilohertz"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "airtableTokenApi",
+        "resource": "record",
+        "operation": "update",
+        "base": {
+          "__rl": true,
+          "mode": "id",
+          "value": "appXXXXXXXXXXXXXX"
+        },
+        "table": {
+          "__rl": true,
+          "mode": "id",
+          "value": "Leads"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "id": "={{ $json.id }}",
+            "Status": "Replied"
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": false
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "ce70092f-74a6-4524-8866-9642cdb3eaf5",
+      "name": "Mark Lead Replied",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.2,
+      "position": [
+        960,
+        380
+      ],
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "khzAirtable0001",
+          "name": "Airtable - Kilohertz"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "airtableTokenApi",
+        "resource": "record",
+        "operation": "create",
+        "base": {
+          "__rl": true,
+          "mode": "id",
+          "value": "appXXXXXXXXXXXXXX"
+        },
+        "table": {
+          "__rl": true,
+          "mode": "id",
+          "value": "Tasks"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Title": "=לחזור לליד: {{ $('Find Lead By Sender').item.json.fields.Name || $('Find Lead By Sender').item.json.fields.Email }}",
+            "Status": "Open",
+            "Priority": "גבוהה",
+            "Source": "Sales Reply",
+            "DueDate": "={{ $now.plus({ days: 1 }).toFormat('yyyy-MM-dd') }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Title",
+              "displayName": "Title",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Priority",
+              "displayName": "Priority",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Source",
+              "displayName": "Source",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "DueDate",
+              "displayName": "DueDate",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "200c4c7c-3033-4ce1-ab5f-5de0f09e44e1",
+      "name": "Open Follow-Up Task",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.2,
+      "position": [
+        1200,
+        380
+      ],
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "khzAirtable0001",
+          "name": "Airtable - Kilohertz"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Check Inbox Every 30 Minutes": {
+      "main": [
+        [
+          {
+            "node": "Extract Sender Address",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Sender Address": {
+      "main": [
+        [
+          {
+            "node": "Find Lead By Sender",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Lead By Sender": {
+      "main": [
+        [
+          {
+            "node": "Classify Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark Lead Replied": {
+      "main": [
+        [
+          {
+            "node": "Open Follow-Up Task",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Classify Reply": {
+      "main": [
+        [
+          {
+            "node": "Mark Lead Unsubscribed",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Mark Lead Replied",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": []
+}

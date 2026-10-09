@@ -1,0 +1,468 @@
+{
+  "id": "khzWf03Leads",
+  "name": "WF03 · Lead Intake",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## WF03 · קליטת לידים וסינון כפילויות\n\n**מה התהליך עושה:** מקבל ליד חדש מטופס באתר / מהאפליקציה, מנקה את הנתונים, בודק אם כתובת המייל כבר קיימת בטבלת Leads, ויוצר ליד חדש רק אם הוא לא כפול. תמיד מחזיר תשובת JSON למי ששלח.\n\n**טריגר:** Webhook מסוג POST בנתיב kilohertz/leads\nגוף הבקשה (JSON): name, email, phone, company, interest, source\n\n**תשובות:**\n- 201 ‏{\"ok\": true, \"id\": \"rec...\"} — הליד נוצר עם Status = New\n- 409 ‏{\"ok\": false, \"duplicate\": true} — המייל כבר קיים\n- 400 ‏{\"ok\": false, \"error\": \"...\"} — מייל חסר או לא תקין\n\n**ניקוי נתונים:** רווחים מיותרים מוסרים, המייל עובר לאותיות קטנות, ו-Source ברירת מחדל = Website. ההשוואה לכפילויות לא תלויה באותיות גדולות/קטנות.\n\n**שדות בשימוש (Leads):** Name, Email, Phone, Company, Interest, Source, Status\n\n**אחרי הייבוא — חובה:**\n1. בשני צומתי Airtable: לבחור את ה-Base שלכם במקום appXXXXXXXXXXXXXX ולבחור מחדש את הטבלה Leads\n2. לבחור את ה-Credential של Airtable\n3. להפעיל (Activate) ולהעתיק את ה-Production URL מצומת ה-Webhook לטופס / לאפליקציה",
+        "height": 424,
+        "width": 1300,
+        "color": 5
+      },
+      "id": "0d2a7b5f-5bff-4d6b-8c32-9cbd3536235e",
+      "name": "הסבר על התהליך",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -60,
+        -384
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "kilohertz/leads",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "c9cf1519-cb4d-437c-bb1a-416adc175536",
+      "name": "Receive Lead",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        300
+      ],
+      "webhookId": "2dc995f4-8859-46ca-bb43-23f17c192cee"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "70c4debb-28c3-4ce4-acb4-b31ddbc4c3d3",
+              "name": "name",
+              "value": "={{ String($json.body?.name ?? '').trim() }}",
+              "type": "string"
+            },
+            {
+              "id": "4b57109c-95c4-4a9a-816e-5ab6c0cf2b99",
+              "name": "email",
+              "value": "={{ String($json.body?.email ?? '').trim().toLowerCase() }}",
+              "type": "string"
+            },
+            {
+              "id": "40ce4ce0-7493-4ae4-8504-bf4decbc330d",
+              "name": "phone",
+              "value": "={{ String($json.body?.phone ?? '').trim() }}",
+              "type": "string"
+            },
+            {
+              "id": "116b3e97-9376-4166-8bb8-22bb95c009e1",
+              "name": "company",
+              "value": "={{ String($json.body?.company ?? '').trim() }}",
+              "type": "string"
+            },
+            {
+              "id": "e4bcc5cc-4c13-495f-8e5e-31f2a6a01b24",
+              "name": "interest",
+              "value": "={{ String($json.body?.interest ?? '').trim() }}",
+              "type": "string"
+            },
+            {
+              "id": "7ddecdd3-97fd-422c-bce5-9a32a0a3ed6e",
+              "name": "source",
+              "value": "={{ String($json.body?.source ?? '').trim() || 'Website' }}",
+              "type": "string"
+            },
+            {
+              "id": "514547cb-2fd0-47c8-a66e-73da8a1f9486",
+              "name": "emailLooksValid",
+              "value": "={{ /^[^\\s@'\"]+@[^\\s@'\"]+\\.[^\\s@'\"]+$/.test(String($json.body?.email ?? '').trim().toLowerCase()) }}",
+              "type": "boolean"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "0545a4fc-049b-4edd-9273-9654f7e8a3b2",
+      "name": "Clean Lead Fields",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        240,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "b702364c-6d36-4dbb-949a-e72dff4803fd",
+              "leftValue": "={{ $json.emailLooksValid }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "640825b7-b1ae-4199-9026-28cf86b96f4c",
+      "name": "Email Is Valid?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        480,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"ok\": false,\n  \"error\": \"כתובת מייל חסרה או לא תקינה\"\n}",
+        "options": {
+          "responseCode": 400
+        }
+      },
+      "id": "53639bc8-9653-47ed-b566-5c0bb9a960bb",
+      "name": "Reply Bad Request",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        720,
+        500
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "airtableTokenApi",
+        "resource": "record",
+        "operation": "search",
+        "base": {
+          "__rl": true,
+          "mode": "id",
+          "value": "appXXXXXXXXXXXXXX"
+        },
+        "table": {
+          "__rl": true,
+          "mode": "id",
+          "value": "Leads"
+        },
+        "filterByFormula": "=LOWER({Email})='{{ $json.email }}'",
+        "returnAll": false,
+        "limit": 1,
+        "options": {}
+      },
+      "id": "44f8b2c6-cebc-473d-bc5c-cb69f5245266",
+      "name": "Look Up Existing Email",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.2,
+      "position": [
+        720,
+        240
+      ],
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "khzAirtable0001",
+          "name": "Airtable - Kilohertz"
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "f78c0439-3aa4-4fef-b6e3-a51063a7ba58",
+              "leftValue": "={{ $json.id ?? '' }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "660c27a7-c527-4da3-a7a4-28b978297fea",
+      "name": "Already In Leads?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        960,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"ok\": false,\n  \"duplicate\": true,\n  \"error\": \"ליד עם כתובת המייל הזו כבר קיים במערכת\"\n}",
+        "options": {
+          "responseCode": 409
+        }
+      },
+      "id": "21bf68ed-7c5a-4394-995a-2b81b5f6d045",
+      "name": "Reply Duplicate",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1200,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "airtableTokenApi",
+        "resource": "record",
+        "operation": "create",
+        "base": {
+          "__rl": true,
+          "mode": "id",
+          "value": "appXXXXXXXXXXXXXX"
+        },
+        "table": {
+          "__rl": true,
+          "mode": "id",
+          "value": "Leads"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Name": "={{ $('Clean Lead Fields').item.json.name }}",
+            "Email": "={{ $('Clean Lead Fields').item.json.email }}",
+            "Phone": "={{ $('Clean Lead Fields').item.json.phone }}",
+            "Company": "={{ $('Clean Lead Fields').item.json.company }}",
+            "Interest": "={{ $('Clean Lead Fields').item.json.interest }}",
+            "Source": "={{ $('Clean Lead Fields').item.json.source }}",
+            "Status": "New"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Name",
+              "displayName": "Name",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Email",
+              "displayName": "Email",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Phone",
+              "displayName": "Phone",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Company",
+              "displayName": "Company",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Interest",
+              "displayName": "Interest",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Source",
+              "displayName": "Source",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "36feb863-51a2-4054-a195-086ecc7bfd19",
+      "name": "Add New Lead",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.2,
+      "position": [
+        1200,
+        360
+      ],
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "khzAirtable0001",
+          "name": "Airtable - Kilohertz"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"ok\": true,\n  \"id\": \"{{ $json.id }}\"\n}",
+        "options": {
+          "responseCode": 201
+        }
+      },
+      "id": "0eb58273-adc4-44d1-8305-1f98d083fc7d",
+      "name": "Reply Created",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1440,
+        360
+      ]
+    }
+  ],
+  "connections": {
+    "Receive Lead": {
+      "main": [
+        [
+          {
+            "node": "Clean Lead Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clean Lead Fields": {
+      "main": [
+        [
+          {
+            "node": "Email Is Valid?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email Is Valid?": {
+      "main": [
+        [
+          {
+            "node": "Look Up Existing Email",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Reply Bad Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Look Up Existing Email": {
+      "main": [
+        [
+          {
+            "node": "Already In Leads?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Already In Leads?": {
+      "main": [
+        [
+          {
+            "node": "Reply Duplicate",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Add New Lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add New Lead": {
+      "main": [
+        [
+          {
+            "node": "Reply Created",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": []
+}
